@@ -28,6 +28,7 @@ contextBridge.exposeInMainWorld('api', {
   },
   worktrees: {
     status: (path) => ipcRenderer.invoke('worktrees:status', path),
+    statusFiles: (path) => ipcRenderer.invoke('worktrees:statusFiles', path),
     setBranch: (workspaceName, worktreePath, branch, createNew) =>
       ipcRenderer.invoke('worktrees:setBranch', workspaceName, worktreePath, branch, createNew),
   },

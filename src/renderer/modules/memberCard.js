@@ -4,6 +4,7 @@ import { runCommand, restoreOutput } from './runs.js';
 import { attachBranchEditor } from './branchEditor.js';
 import { notify } from './notify.js';
 import { showActionMenu } from './actionMenu.js';
+import { openModifiedFiles } from './modifiedFilesModal.js';
 
 function bindCommandButton(btn, card) {
   const commandName = btn.dataset.command;
@@ -92,6 +93,14 @@ export function renderMembers() {
     card.querySelectorAll('[data-action="watch"]').forEach(btn => bindWatchToggle(btn, card));
     const moreBtn = card.querySelector('[data-action="more"]');
     if (moreBtn) moreBtn.addEventListener('click', () => showActionMenu(moreBtn, card));
+    const statusBadge = card.querySelector('[data-status]');
+    if (statusBadge) {
+      statusBadge.addEventListener('click', () => {
+        if (statusBadge.classList.contains('dirty')) {
+          openModifiedFiles(repoLabel, m.worktreePath);
+        }
+      });
+    }
     attachBranchEditor(card, card.querySelector('[data-branch]'), m.branch);
 
     // Restore most-recent saved run for this worktree (any command).

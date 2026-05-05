@@ -15,6 +15,7 @@ import { setupDisplayMode } from './modules/displayMode.js';
 import { setupKeyboardHelp } from './modules/keyboardHelp.js';
 import { setupCommandPalette } from './modules/commandPalette.js';
 import { setupDiffModal } from './modules/diffModal.js';
+import { setupModifiedFilesModal } from './modules/modifiedFilesModal.js';
 import { setupCommitModal } from './modules/commitModal.js';
 import { setupShowArchivedToggle } from './modules/archivedToggle.js';
 
@@ -34,6 +35,7 @@ setupDisplayMode();
 setupKeyboardHelp();
 setupCommandPalette();
 setupDiffModal();
+setupModifiedFilesModal();
 setupCommitModal();
 setupShowArchivedToggle();
 refresh();

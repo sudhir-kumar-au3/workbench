@@ -153,6 +153,11 @@ function registerHandlers({ settingsStore, runsStore, commandRunner, watcherRegi
     return data.workspaces;
   });
 
+  ipcMain.handle('worktrees:statusFiles', (_e, worktreePath) => {
+    assertNonEmptyString(worktreePath, 'worktreePath');
+    return git.statusFiles(worktreePath);
+  });
+
   // Worktrees
   ipcMain.handle('worktrees:status', async (_e, worktreePath) => {
     const [status, ab] = await Promise.all([

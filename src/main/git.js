@@ -50,6 +50,41 @@ async function statusOf(worktreePath) {
   }
 }
 
+async function statusFiles(worktreePath) {
+  // Returns the parsed `git status --porcelain` lines as structured entries.
+  try {
+    const out = await gitExec(worktreePath, ['status', '--porcelain']);
+    return out
+      .split('\n')
+      .filter(Boolean)
+      .map(line => {
+        // Two-character status code, then space, then path. Renames look like
+        // "R  old -> new"; we keep the destination path as the user-facing one.
+        const code = line.slice(0, 2);
+        let rest = line.slice(3);
+        let oldPath = null;
+        const arrow = rest.indexOf(' -> ');
+        if (arrow !== -1) {
+          oldPath = rest.slice(0, arrow);
+          rest = rest.slice(arrow + 4);
+        }
+        const trimmed = code.trim();
+        const kind =
+          code === '??' ? 'untracked'
+          : trimmed.includes('D') ? 'D'
+          : trimmed.includes('A') ? 'A'
+          : trimmed.includes('R') ? 'R'
+          : trimmed.includes('C') ? 'C'
+          : trimmed.includes('U') ? 'U'
+          : 'M';
+        const staged = code[0] !== ' ' && code[0] !== '?';
+        return { code, kind, path: rest, oldPath, staged };
+      });
+  } catch (e) {
+    return { error: e.message };
+  }
+}
+
 async function aheadBehindOf(worktreePath) {
   try {
     const upstream = (await gitExec(worktreePath, ['rev-parse', '--abbrev-ref', '@{upstream}'])).trim();
@@ -213,6 +248,7 @@ module.exports = {
   isGitRepo,
   listBranches,
   statusOf,
+  statusFiles,
   aheadBehindOf,
   isMergedInto,
   branchResolvable,
