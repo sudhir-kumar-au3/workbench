@@ -2,21 +2,6 @@
 
 Desktop UI (Electron) for managing **git worktrees** across multiple repos at once. Group worktrees into **workspaces** so a feature branch lives in one place across frontend, backend, infra, etc.
 
-## Features
-
-- **Workspaces** — bundle worktrees from multiple repos under one branch name; create, import, archive, reorder
-- **Auto branch mode** — create the branch if missing, check it out if it exists, per repo
-- **Per-worktree commands** — auto-detected from `package.json` / `Cargo.toml` / `go.mod` / `pyproject.toml`, plus watch mode
-- **Inline branch switcher** with autocomplete; **diff viewer**, **commit + push**, stash, fast-forward, fetch / pull / sync
-- **Cmd+K palette** + keyboard shortcuts; native notifications; auto-fetch on focus
-- Light/dark themes, 5 accent presets, compact mode, resizable sidebar, ANSI-colored output
-
-## Requirements
-
-- Node.js 18+, git 2.23+
-- macOS / Linux / Windows
-- Optional: VS Code or Cursor (for the editor button)
-
 ## Install & run
 
 ```bash
@@ -25,6 +10,8 @@ cd workbench
 npm install
 npm start
 ```
+
+Requirements: Node.js 18+, git 2.23+, macOS / Linux / Windows. Optional: VS Code or Cursor (for the editor button).
 
 ## First-time setup
 
@@ -44,6 +31,15 @@ npm start
 macOS Gatekeeper on first launch: `xattr -dr com.apple.quarantine /Applications/Worktree\ Workbench.app` or right-click → **Open**. For notarized distribution, set `APPLE_ID` / `APPLE_APP_SPECIFIC_PASSWORD` / `APPLE_TEAM_ID` and remove `"identity": null` from `build.mac` in `package.json`.
 
 Drop a `build/icon.png` (≥ 1024×1024) for a custom icon.
+
+## Features
+
+- **Workspaces** — bundle worktrees from multiple repos under one branch name; create, import, archive, reorder
+- **Auto branch mode** — create the branch if missing, check it out if it exists, per repo
+- **Per-worktree commands** — auto-detected from `package.json` / `Cargo.toml` / `go.mod` / `pyproject.toml`, plus watch mode
+- **Inline branch switcher** with autocomplete; **diff viewer**, **commit + push**, stash, fast-forward, fetch / pull / sync
+- **Cmd+K palette** + keyboard shortcuts; native notifications; auto-fetch on focus
+- Light/dark themes, 5 accent presets, compact mode, resizable sidebar, ANSI-colored output
 
 ## Development
 
