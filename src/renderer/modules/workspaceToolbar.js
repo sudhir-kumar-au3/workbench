@@ -69,11 +69,6 @@ export function setupWorkspaceToolbar({ openMetadataModal }) {
     for (const [runId] of state.runs) globalThis.api.runs.stop(runId);
   });
 
-  $('#ws-open').addEventListener('click', () => {
-    const ws = state.activeWorkspace;
-    if (ws) globalThis.api.fs.openPath(`${ws.parentDir}/${ws.name}`);
-  });
-
   $('#ws-edit-meta').addEventListener('click', () => openMetadataModal());
 
   $('#ws-archive').addEventListener('click', async () => {

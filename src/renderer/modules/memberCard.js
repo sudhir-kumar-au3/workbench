@@ -69,9 +69,23 @@ export function renderMembers() {
           <div class="member-path" title="${escapeHtml(m.worktreePath)}">${escapeHtml(m.worktreePath)}</div>
         </div>
         <div class="member-actions">
-          <button class="btn" data-action="finder" title="Open in Finder">Finder</button>
-          <button class="btn" data-action="terminal" title="Open in Terminal">Terminal</button>
-          <button class="btn" data-action="editor" title="Open in editor (VS Code/Cursor)">Editor</button>
+          <button class="btn btn-icon" data-action="finder" title="Open in Finder" aria-label="Open in Finder">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+            </svg>
+          </button>
+          <button class="btn btn-icon" data-action="terminal" title="Open in Terminal" aria-label="Open in Terminal">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polyline points="4 7 10 12 4 17"/>
+              <line x1="12" y1="19" x2="20" y2="19"/>
+            </svg>
+          </button>
+          <button class="btn btn-icon" data-action="editor" title="Open in editor (VS Code/Cursor)" aria-label="Open in editor">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polyline points="16 18 22 12 16 6"/>
+              <polyline points="8 6 2 12 8 18"/>
+            </svg>
+          </button>
           <span class="command-buttons">${cmdSplitsHtml}</span>
           <button class="btn btn-ghost" data-action="more" title="More actions" aria-label="More actions">⋯</button>
         </div>

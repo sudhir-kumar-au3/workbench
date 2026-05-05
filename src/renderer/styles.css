@@ -628,6 +628,17 @@ body.resizing * { cursor: col-resize !important; }
   text-overflow: ellipsis;
 }
 .member-actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.btn.btn-icon {
+  padding: 0;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+}
+.btn.btn-icon:hover { color: var(--text); }
+.btn.btn-icon svg { display: block; }
 .command-buttons { display: flex; gap: 4px; }
 .cmd-btn {
   background: var(--success-grad);
