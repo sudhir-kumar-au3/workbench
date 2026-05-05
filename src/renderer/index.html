@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'">
+  <title>Worktree Workbench</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body data-theme="system" data-accent="indigo">
+  <div class="app">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <h2>Workspaces</h2>
+        <div class="sidebar-actions">
+          <button id="import-workspace" class="btn" title="Import existing worktrees as a workspace">Import</button>
+          <button id="new-workspace" class="btn btn-primary" title="New workspace (Cmd+N)">+ New</button>
+        </div>
+      </div>
+      <ul id="workspace-list" class="sidebar-list"></ul>
+      <div class="sidebar-footer">
+        <button id="manage-repos" class="btn-link">Manage repos</button>
+        <button id="settings-btn" class="btn-link">Settings</button>
+        <button id="theme-toggle" class="btn-link">Theme: system</button>
+        <button id="show-archived-toggle" class="btn-link">Show archived</button>
+        <button id="kbd-help" class="btn-link" title="Keyboard shortcuts (?)">Shortcuts</button>
+      </div>
+      <div class="resize-handle" id="sidebar-resizer" title="Drag to resize"></div>
+    </aside>
+
+    <button id="sidebar-collapse-toggle" class="sidebar-collapse-btn" title="Collapse sidebar (Cmd+\\)">‹</button>
+
+    <main class="main">
+      <div id="empty-state" class="empty-state">
+        <div>
+          <h1>Worktree Workbench</h1>
+          <p>Workspaces let you check out a feature branch across multiple repos at once.</p>
+          <p>Add your repos first, then create a workspace.</p>
+          <div class="empty-actions">
+            <button id="empty-manage-repos" class="btn">Manage repos</button>
+            <button id="empty-new-workspace" class="btn btn-primary">+ New workspace</button>
+          </div>
+          <p class="hint shortcut-hint">Shortcuts: Cmd+N new · Cmd+1..9 switch · R run · S stop · Esc close modals</p>
+        </div>
+      </div>
+
+      <section id="workspace-view" class="workspace-view hidden">
+        <header class="workspace-header">
+          <div>
+            <div class="ws-title-row">
+              <h1 id="ws-name" aria-live="polite">Workspace</h1>
+              <button id="ws-edit-meta" class="btn btn-ghost" title="Edit metadata">✎</button>
+            </div>
+            <p id="ws-meta" class="workspace-meta"></p>
+            <p id="ws-description" class="workspace-description hidden"></p>
+            <details id="ws-notes-wrap" class="workspace-notes hidden">
+              <summary>Notes</summary>
+              <pre id="ws-notes" class="workspace-notes-body"></pre>
+            </details>
+            <div id="ws-links" class="workspace-links"></div>
+          </div>
+          <div class="workspace-actions">
+            <button id="ws-compact-toggle" class="btn" title="Toggle compact mode">≡</button>
+            <button id="ws-refresh" class="btn" title="Refresh status">↻</button>
+            <div class="btn-group">
+              <button id="ws-fetch" class="btn">Fetch</button>
+              <button id="ws-pull" class="btn">Pull</button>
+              <button id="ws-sync" class="btn">Sync</button>
+              <button id="ws-push" class="btn">Push</button>
+            </div>
+            <button id="ws-run-all" class="btn btn-success">Run all</button>
+            <button id="ws-run-all-seq" class="btn">Run sequentially</button>
+            <button id="ws-stop-all" class="btn btn-danger hidden">Stop all</button>
+            <button id="ws-open" class="btn">Open folder</button>
+            <button id="ws-archive" class="btn" title="Archive workspace">Archive</button>
+            <button id="ws-delete" class="btn btn-danger">Delete</button>
+          </div>
+        </header>
+        <div id="member-list" class="member-list"></div>
+      </section>
+    </main>
+  </div>
+
+  <!-- New workspace modal -->
+  <div id="new-workspace-modal" class="modal hidden">
+    <div class="modal-content modal-wide">
+      <h2>New workspace</h2>
+      <div class="form-row">
+        <label>Name
+          <input id="ws-input-name" type="text" placeholder="feat-x" />
+        </label>
+        <label>Default branch
+          <input id="ws-input-branch" type="text" placeholder="defaults to name" />
+        </label>
+      </div>
+      <label>Branch handling
+        <select id="ws-branch-mode">
+          <option value="auto" selected>Auto — create if missing, use if it exists</option>
+          <option value="create">Create new branch (fail if it exists)</option>
+          <option value="existing">Use existing branch (fail if missing)</option>
+        </select>
+      </label>
+      <label>Parent directory
+        <div class="path-row">
+          <input id="ws-input-parent" type="text" />
+          <button id="ws-pick-parent" class="btn">Browse</button>
+        </div>
+      </label>
+      <fieldset class="repo-fieldset">
+        <legend>Repos to include (override branch per repo if needed)</legend>
+        <div id="ws-repo-rows" class="repo-rows-compact"></div>
+      </fieldset>
+      <div class="modal-actions">
+        <button id="ws-cancel" class="btn">Cancel</button>
+        <button id="ws-confirm" class="btn btn-primary">Create</button>
+      </div>
+      <p id="ws-error" class="error"></p>
+    </div>
+  </div>
+
+  <!-- Import workspace modal -->
+  <div id="import-workspace-modal" class="modal hidden">
+    <div class="modal-content modal-wide">
+      <h2>Import existing workspace</h2>
+      <p class="hint">Pick a directory containing worktrees you've already created (e.g. <code>~/worktrees/feat-x/</code>). Detected worktrees will be added as workspace members; their repos will be auto-registered if needed.</p>
+      <label>Workspace name
+        <input id="import-name" type="text" placeholder="feat-x" />
+      </label>
+      <label>Directory to scan
+        <div class="path-row">
+          <input id="import-dir" type="text" placeholder="/path/to/feat-x" />
+          <button id="import-pick-dir" class="btn">Browse</button>
+          <button id="import-scan" class="btn btn-primary">Scan</button>
+        </div>
+      </label>
+      <fieldset class="repo-fieldset">
+        <legend>Detected worktrees</legend>
+        <div id="import-results" class="repo-rows-compact">
+          <p class="hint">Pick a directory and click Scan.</p>
+        </div>
+      </fieldset>
+      <div class="modal-actions">
+        <button id="import-cancel" class="btn">Cancel</button>
+        <button id="import-confirm" class="btn btn-primary" disabled>Import</button>
+      </div>
+      <p id="import-error" class="error"></p>
+    </div>
+  </div>
+
+  <!-- Manage repos modal -->
+  <div id="manage-repos-modal" class="modal hidden">
+    <div class="modal-content modal-wide">
+      <div class="modal-header-row">
+        <h2>Repositories</h2>
+        <button id="repo-add" class="btn btn-primary">+ Add repo</button>
+      </div>
+      <p class="hint">Each repo can have multiple commands (test, lint, build, dev). They appear as buttons on each worktree card.</p>
+      <div id="repo-rows" class="repo-rows"></div>
+      <div class="modal-actions">
+        <button id="repo-close" class="btn">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Workspace metadata modal -->
+  <div id="meta-modal" class="modal hidden">
+    <div class="modal-content modal-wide">
+      <h2>Workspace details</h2>
+      <label>Description
+        <textarea id="meta-description" rows="2" placeholder="One-line summary"></textarea>
+      </label>
+      <label>Notes
+        <textarea id="meta-notes" rows="5" placeholder="Freeform notes — paste design docs, decisions, links."></textarea>
+      </label>
+      <fieldset class="repo-fieldset">
+        <legend>Links</legend>
+        <div id="meta-links" class="meta-links"></div>
+        <button id="meta-add-link" class="btn btn-link">+ Add link</button>
+      </fieldset>
+      <div class="modal-actions">
+        <button id="meta-cancel" class="btn">Cancel</button>
+        <button id="meta-save" class="btn btn-primary">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings modal -->
+  <div id="settings-modal" class="modal hidden">
+    <div class="modal-content">
+      <h2>Settings</h2>
+      <label>Default workspaces directory
+        <div class="path-row">
+          <input id="settings-root" type="text" readonly />
+          <button id="settings-pick-root" class="btn">Change</button>
+        </div>
+      </label>
+      <p class="hint">New workspaces are created under this directory by default.</p>
+      <div class="field-label">Accent color</div>
+      <div id="accent-swatches" class="accent-swatches">
+        <button class="accent-swatch" data-accent="indigo" title="Indigo (default)" aria-label="Indigo accent"></button>
+        <button class="accent-swatch" data-accent="emerald" title="Emerald" aria-label="Emerald accent"></button>
+        <button class="accent-swatch" data-accent="cyan" title="Cyan" aria-label="Cyan accent"></button>
+        <button class="accent-swatch" data-accent="rose" title="Rose" aria-label="Rose accent"></button>
+        <button class="accent-swatch" data-accent="amber" title="Amber" aria-label="Amber accent"></button>
+      </div>
+      <label class="checkbox">
+        <input id="settings-reduced-motion" type="checkbox" /> Reduce motion / animations
+      </label>
+      <div class="modal-actions">
+        <button id="settings-close" class="btn">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Command palette (Cmd+K) -->
+  <div id="palette-modal" class="modal hidden">
+    <div class="palette">
+      <input id="palette-input" type="text" placeholder="Type a workspace, repo, command, or action…" autocomplete="off" />
+      <div id="palette-results" class="palette-results"></div>
+      <div class="palette-footer">
+        <span><kbd>↑</kbd> <kbd>↓</kbd> navigate</span>
+        <span><kbd>↵</kbd> select</span>
+        <span><kbd>Esc</kbd> close</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Keyboard shortcuts modal -->
+  <div id="help-modal" class="modal hidden">
+    <div class="modal-content">
+      <h2>Keyboard shortcuts</h2>
+      <table class="kbd-table">
+        <thead class="sr-only">
+          <tr><th scope="col">Shortcut</th><th scope="col">Action</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><kbd>Cmd</kbd>+<kbd>K</kbd></td><td>Open command palette</td></tr>
+          <tr><td><kbd>Cmd</kbd>+<kbd>N</kbd></td><td>New workspace</td></tr>
+          <tr><td><kbd>Cmd</kbd>+<kbd>1</kbd>–<kbd>9</kbd></td><td>Switch to workspace</td></tr>
+          <tr><td><kbd>Cmd</kbd>+<kbd>\\</kbd></td><td>Toggle sidebar</td></tr>
+          <tr><td><kbd>R</kbd></td><td>Run all (default command)</td></tr>
+          <tr><td><kbd>S</kbd></td><td>Stop all running</td></tr>
+          <tr><td><kbd>?</kbd></td><td>This dialog</td></tr>
+          <tr><td><kbd>Esc</kbd></td><td>Close any open modal</td></tr>
+        </tbody>
+      </table>
+      <div class="modal-actions">
+        <button id="help-close" class="btn btn-primary">Got it</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Diff viewer -->
+  <div id="diff-modal" class="modal hidden">
+    <div class="modal-content modal-wide">
+      <div class="modal-header-row">
+        <h2 id="diff-title">Diff</h2>
+        <span class="muted" id="diff-meta"></span>
+      </div>
+      <pre id="diff-body" class="diff-body"></pre>
+      <div class="modal-actions">
+        <button id="diff-close" class="btn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Commit + push -->
+  <div id="commit-modal" class="modal hidden">
+    <div class="modal-content">
+      <h2 id="commit-title">Commit</h2>
+      <p class="hint" id="commit-meta"></p>
+      <label>Message
+        <textarea id="commit-message" rows="3" placeholder="Brief description of the change"></textarea>
+      </label>
+      <label class="checkbox">
+        <input id="commit-push" type="checkbox" /> Push after committing
+      </label>
+      <div class="modal-actions">
+        <button id="commit-cancel" class="btn">Cancel</button>
+        <button id="commit-confirm" class="btn btn-primary">Commit</button>
+      </div>
+      <p id="commit-error" class="error"></p>
+    </div>
+  </div>
+
+  <!-- Bulk git result toast -->
+  <div id="bulk-toast" class="bulk-toast hidden">
+    <div class="bulk-toast-header">
+      <span id="bulk-toast-title"></span>
+      <button id="bulk-toast-close" class="btn-link">×</button>
+    </div>
+    <div id="bulk-toast-body" class="bulk-toast-body"></div>
+  </div>
+
+  <script type="module" src="renderer.js"></script>
+</body>
+</html>

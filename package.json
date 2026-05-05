@@ -1,0 +1,86 @@
+{
+  "name": "worktree-workbench",
+  "version": "0.2.0",
+  "description": "Electron UI for managing git worktrees",
+  "main": "src/main.js",
+  "author": {
+    "name": "Sudhir Kumar",
+    "email": "muraliiith@gmail.com"
+  },
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src tests",
+    "format": "prettier --write src tests",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder",
+    "dist:mac": "electron-builder --mac",
+    "dist:win": "electron-builder --win",
+    "dist:linux": "electron-builder --linux"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "npm run lint && npm test"
+  },
+  "build": {
+    "appId": "com.sudhirkumar.worktree-workbench",
+    "productName": "Worktree Workbench",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "afterPack": "./build/afterPack.js",
+    "files": [
+      "src/**/*",
+      "package.json",
+      "!**/*.test.js",
+      "!**/{tests,coverage,docs}/**",
+      "!**/.{git,vscode,idea}/**"
+    ],
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "identity": null,
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ]
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "linux": {
+      "category": "Development",
+      "target": [
+        "AppImage",
+        "deb"
+      ]
+    }
+  },
+  "dependencies": {
+    "chokidar": "^3.6.0",
+    "electron-log": "^5.4.3"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "electron": "^32.0.0",
+    "electron-builder": "^26.8.1",
+    "eslint": "^10.3.0",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.6.0",
+    "prettier": "^3.8.3",
+    "simple-git-hooks": "^2.13.1",
+    "vitest": "^4.1.5"
+  }
+}
