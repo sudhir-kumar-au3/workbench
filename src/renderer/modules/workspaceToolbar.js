@@ -5,6 +5,14 @@ import { runCommand } from './runs.js';
 import { loadAllStatuses } from './statuses.js';
 import { showToast } from './bulkGitToast.js';
 import { notify } from './notify.js';
+import { openGitFailure } from './gitFailureModal.js';
+
+const OP_DISPLAY_TO_KIND = {
+  fetch: 'pull',  // fetch failures are basically network/auth — group with pull
+  pull: 'pull',
+  rebase: 'sync',
+  push: 'push',
+};
 
 function defaultCommand(card) {
   // Pick a deterministic default command — first one configured for the repo.
@@ -19,13 +27,31 @@ async function runBulkOp(op, label) {
   const ws = state.activeWorkspace;
   if (!ws) return;
   const paths = ws.members.map(m => m.worktreePath);
+  const failureOp = OP_DISPLAY_TO_KIND[op] || op;
   showToast(`${label} (running…)`, paths.map(p => ({ worktreePath: p, ok: true, output: '…' })));
   try {
     const results = await globalThis.api.git.bulkOp(op, paths);
-    showToast(label, results);
+    const failures = results.filter(r => !r.ok);
+    // If exactly one member failed, open the failure dialog directly — saves a click.
+    // Multiple failures still go through the toast (with per-row "Investigate…" buttons).
+    if (failures.length === 1 && results.length > 1) {
+      showToast(label, results, failureOp);
+      const f = failures[0];
+      const member = ws.members.find(m => m.worktreePath === f.worktreePath);
+      const repoLabel = member ? state.repos.find(r => r.path === member.repoPath)?.name || member.repoPath.split('/').pop() : '';
+      openGitFailure({ op: failureOp, worktreePath: f.worktreePath, label: repoLabel, error: f.error });
+    } else if (failures.length === 1 && results.length === 1) {
+      // Single-member workspace: skip the toast entirely; open the dialog.
+      const f = failures[0];
+      const member = ws.members.find(m => m.worktreePath === f.worktreePath);
+      const repoLabel = member ? state.repos.find(r => r.path === member.repoPath)?.name || member.repoPath.split('/').pop() : '';
+      openGitFailure({ op: failureOp, worktreePath: f.worktreePath, label: repoLabel, error: f.error });
+    } else {
+      showToast(label, results, failureOp);
+    }
     loadAllStatuses();
   } catch (e) {
-    showToast(label, paths.map(p => ({ worktreePath: p, ok: false, error: e.message })));
+    showToast(label, paths.map(p => ({ worktreePath: p, ok: false, error: e.message })), failureOp);
   }
 }
 

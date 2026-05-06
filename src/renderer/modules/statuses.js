@@ -55,6 +55,28 @@ function applyStatusToCard(card, r) {
   }
 }
 
+export async function loadStatusFor(worktreePath) {
+  const card = document.querySelector(`#member-list .member-card[data-worktree-path="${CSS.escape(worktreePath)}"]`);
+  if (!card) return;
+  const badge = card.querySelector('[data-status]');
+  if (badge && !badge.classList.contains('loading')) {
+    badge.textContent = '…';
+    badge.className = 'status-badge loading';
+  }
+  try {
+    const r = await fetchStatusOnce(worktreePath);
+    if (!card.isConnected) return;
+    applyStatusToCard(card, r);
+  } catch (e) {
+    if (!card.isConnected) return;
+    if (badge) {
+      badge.textContent = 'error';
+      badge.className = 'status-badge error';
+      badge.title = e.message;
+    }
+  }
+}
+
 export async function loadAllStatuses() {
   if (!state.activeWorkspace) return;
   const cards = document.querySelectorAll('#member-list .member-card');

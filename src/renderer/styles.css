@@ -873,6 +873,50 @@ body.reduced-motion .test-output-toolbar [data-close].is-stop { animation: none;
 }
 .modal-wide { width: 640px; }
 
+.git-failure-summary {
+  margin: 0 0 14px 0;
+  padding: 12px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text);
+  background: rgba(248, 113, 113, 0.08);
+  border: 1px solid rgba(248, 113, 113, 0.28);
+}
+.git-failure-files-wrap { margin: 0 0 14px 0; }
+.git-failure-files-wrap.hidden { display: none; }
+.git-failure-files-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 0 0 6px 2px;
+}
+.git-failure-raw {
+  margin: 0 0 14px 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.git-failure-raw summary {
+  cursor: pointer;
+  user-select: none;
+  padding: 4px 0;
+}
+.git-failure-raw summary:hover { color: var(--text); }
+.git-failure-raw pre {
+  margin: 6px 0 0 0;
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.24);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  font-family: 'SF Mono', Menlo, monospace;
+  font-size: 11px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 180px;
+  overflow: auto;
+  color: var(--text);
+}
+
 .modal-content h2 {
   margin: 0 0 18px 0;
   font-size: 17px;
@@ -971,6 +1015,32 @@ textarea { resize: vertical; min-height: 60px; }
 
 .error { color: var(--danger); font-size: 12px; min-height: 16px; margin: 8px 0 0 0; white-space: pre-wrap; }
 .hint { color: var(--text-faint); font-size: 12px; margin: 0 0 12px 0; line-height: 1.5; }
+
+.commit-progress {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 10px 0 0 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+.commit-progress.hidden { display: none; }
+.commit-progress.done { color: #34d399; border-color: rgba(52, 211, 153, 0.3); }
+.commit-progress.done .spinner { display: none; }
+.commit-progress .spinner {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  border-top-color: var(--accent);
+  animation: commit-spin 0.7s linear infinite;
+}
+body.reduced-motion .commit-progress .spinner { animation: none; }
+@keyframes commit-spin { to { transform: rotate(360deg); } }
 
 /* ----- Repo rows in Manage Repos modal ----- */
 .repo-rows {

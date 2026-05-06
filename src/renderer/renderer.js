@@ -17,6 +17,7 @@ import { setupCommandPalette } from './modules/commandPalette.js';
 import { setupDiffModal } from './modules/diffModal.js';
 import { setupModifiedFilesModal } from './modules/modifiedFilesModal.js';
 import { setupCommitModal } from './modules/commitModal.js';
+import { setupGitFailureModal } from './modules/gitFailureModal.js';
 import { setupShowArchivedToggle } from './modules/archivedToggle.js';
 
 attachRunListeners();
@@ -37,5 +38,6 @@ setupCommandPalette();
 setupDiffModal();
 setupModifiedFilesModal();
 setupCommitModal();
+setupGitFailureModal();
 setupShowArchivedToggle();
 refresh();

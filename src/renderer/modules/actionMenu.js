@@ -2,8 +2,9 @@ import { state } from './state.js';
 import { notify } from './notify.js';
 import { openDiff } from './diffModal.js';
 import { openCommitModal } from './commitModal.js';
-import { loadAllStatuses } from './statuses.js';
+import { loadStatusFor } from './statuses.js';
 import { restoreOutput } from './runs.js';
+import { openGitFailure } from './gitFailureModal.js';
 
 let openMenu = null;
 
@@ -69,21 +70,33 @@ function buildItems(card) {
     {
       label: 'Fast-forward (pull --ff-only)',
       run: async () => {
-        try { await globalThis.api.git.fastForward(worktreePath); notify.success('Fast-forwarded.'); loadAllStatuses(); }
-        catch (e) { notify.error(e.message); }
+        const doFf = () => globalThis.api.git.fastForward(worktreePath);
+        try {
+          await doFf();
+          notify.success('Fast-forwarded.');
+          loadStatusFor(worktreePath);
+        } catch (e) {
+          openGitFailure({
+            op: 'fast-forward',
+            worktreePath,
+            label: repoLabel,
+            error: e.message,
+            retry: doFf,
+          });
+        }
       },
     },
     {
       label: 'Stash changes',
       run: async () => {
-        try { await globalThis.api.git.stash(worktreePath, ''); notify.success('Stashed.'); loadAllStatuses(); }
+        try { await globalThis.api.git.stash(worktreePath, ''); notify.success('Stashed.'); loadStatusFor(worktreePath); }
         catch (e) { notify.error(e.message); }
       },
     },
     {
       label: 'Pop latest stash',
       run: async () => {
-        try { await globalThis.api.git.stashPop(worktreePath); notify.success('Stash popped.'); loadAllStatuses(); }
+        try { await globalThis.api.git.stashPop(worktreePath); notify.success('Stash popped.'); loadStatusFor(worktreePath); }
         catch (e) { notify.error(e.message); }
       },
     },

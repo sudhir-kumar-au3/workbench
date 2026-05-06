@@ -266,6 +266,26 @@
     </div>
   </div>
 
+  <!-- Git operation failure dialog -->
+  <div id="git-failure-modal" class="modal hidden">
+    <div class="modal-content modal-wide">
+      <div class="modal-header-row">
+        <h2 id="git-failure-title">Operation failed</h2>
+        <span class="muted" id="git-failure-meta"></span>
+      </div>
+      <p class="git-failure-summary" id="git-failure-summary"></p>
+      <div id="git-failure-files-wrap" class="git-failure-files-wrap hidden">
+        <div class="muted git-failure-files-label">Files in your working tree:</div>
+        <div id="git-failure-files-list" class="modified-files-list"></div>
+      </div>
+      <details class="git-failure-raw">
+        <summary>Show full git output</summary>
+        <pre id="git-failure-raw"></pre>
+      </details>
+      <div class="modal-actions" id="git-failure-actions"></div>
+    </div>
+  </div>
+
   <!-- Diff viewer -->
   <div id="diff-modal" class="modal hidden">
     <div class="modal-content modal-wide">
@@ -295,6 +315,10 @@
         <button id="commit-cancel" class="btn">Cancel</button>
         <button id="commit-confirm" class="btn btn-primary">Commit</button>
       </div>
+      <p id="commit-progress" class="commit-progress hidden">
+        <span class="spinner" aria-hidden="true"></span>
+        <span data-progress-text></span>
+      </p>
       <p id="commit-error" class="error"></p>
     </div>
   </div>
