@@ -32,6 +32,35 @@ function commandsSignature(commands) {
   return commands.map(c => `${c.name}|${c.command || ''}`).join(';');
 }
 
+async function loadPrChip(card, worktreePath) {
+  const chip = card.querySelector('[data-pr]');
+  if (!chip) return;
+  try {
+    const pr = await globalThis.api.git.prForBranch(worktreePath);
+    if (!card.isConnected) return;
+    if (!pr?.number) {
+      chip.classList.add('hidden');
+      chip.textContent = '';
+      return;
+    }
+    const stateClass = (pr.state || '').toLowerCase();
+    chip.classList.remove('hidden');
+    chip.dataset.url = pr.url || '';
+    chip.dataset.state = stateClass;
+    chip.title = pr.title ? `${pr.title} — ${pr.url}` : pr.url || '';
+    chip.textContent = `PR #${pr.number}`;
+  } catch {
+    // gh not installed or non-GitHub remote — silently ignore.
+  }
+}
+
+// Re-runs PR lookup for every member card currently in the DOM.
+// Pair with `globalThis.api.git.clearPrCache()` first to bust the 60s server-side cache.
+export async function refreshPrChips() {
+  const cards = document.querySelectorAll('#member-list .member-card');
+  await Promise.all(Array.from(cards).map(card => loadPrChip(card, card.dataset.worktreePath)));
+}
+
 async function loadAndRestoreSavedRun(card, worktreePath) {
   try {
     const saved = await globalThis.api.runs.forWorktree(worktreePath);
@@ -81,6 +110,7 @@ function buildCard(m) {
           <span class="member-branch" data-branch>${escapeHtml(m.branch)} <span class="caret">▾</span></span>
           <span class="status-badge" data-status></span>
           <span class="ahead-behind" data-ahead-behind></span>
+          <span class="pr-chip hidden" data-pr></span>
         </div>
         <div class="member-path" data-path-display title="${escapeHtml(m.worktreePath)}">${escapeHtml(m.worktreePath)}</div>
       </div>
@@ -133,7 +163,16 @@ function buildCard(m) {
   }
   attachBranchEditor(card, card.querySelector('[data-branch]'), m.branch);
 
+  const prChip = card.querySelector('[data-pr]');
+  if (prChip) {
+    prChip.addEventListener('click', () => {
+      const url = prChip.dataset.url;
+      if (url) globalThis.api.fs.openPath(url);
+    });
+  }
+
   loadAndRestoreSavedRun(card, m.worktreePath);
+  loadPrChip(card, m.worktreePath);
   return card;
 }
 

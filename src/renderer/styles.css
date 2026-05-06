@@ -1016,6 +1016,145 @@ textarea { resize: vertical; min-height: 60px; }
 .error { color: var(--danger); font-size: 12px; min-height: 16px; margin: 8px 0 0 0; white-space: pre-wrap; }
 .hint { color: var(--text-faint); font-size: 12px; margin: 0 0 12px 0; line-height: 1.5; }
 
+.pr-chip {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  cursor: pointer;
+  background: rgba(34, 211, 238, 0.12);
+  color: #67e8f9;
+  border: 1px solid rgba(34, 211, 238, 0.35);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.pr-chip.hidden { display: none; }
+.pr-chip:hover { background: rgba(34, 211, 238, 0.2); color: #ffffff; }
+.pr-chip[data-state="merged"] {
+  background: rgba(168, 85, 247, 0.12);
+  color: #d8b4fe;
+  border-color: rgba(168, 85, 247, 0.35);
+}
+.pr-chip[data-state="closed"] {
+  background: rgba(220, 38, 38, 0.12);
+  color: #fca5a5;
+  border-color: rgba(220, 38, 38, 0.35);
+}
+
+.history-filter {
+  width: 100%;
+  margin: 0 0 10px 0;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  color: var(--text);
+  padding: 8px 12px;
+  font-size: 12px;
+  font-family: inherit;
+  outline: none;
+}
+.history-filter:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+.history-list {
+  max-height: 480px;
+  overflow-y: auto;
+  margin: 0 0 12px 0;
+  padding: 4px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+.history-list .empty-row {
+  padding: 18px;
+  text-align: center;
+  color: var(--text-faint);
+  font-size: 12px;
+}
+.history-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.history-row:hover { background: rgba(255, 255, 255, 0.04); }
+.history-row-main { flex: 1; min-width: 0; }
+.history-row-message {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 2px;
+}
+.history-row-meta {
+  display: flex;
+  gap: 10px;
+  font-size: 11px;
+  align-items: baseline;
+}
+.history-hash {
+  font-family: 'SF Mono', Menlo, monospace;
+  color: var(--accent);
+  font-size: 10.5px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(124, 140, 255, 0.1);
+}
+
+.commit-files-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 0 6px 0;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.commit-files-controls { display: flex; gap: 4px; }
+.commit-files-controls .btn { padding: 2px 8px; font-size: 11px; }
+.commit-files-list {
+  max-height: 200px;
+  overflow-y: auto;
+  margin: 0 0 12px 0;
+  padding: 4px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+.commit-files-list .empty-row {
+  padding: 14px;
+  text-align: center;
+  color: var(--text-faint);
+  font-size: 12px;
+}
+.commit-file-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background 0.12s ease;
+}
+.commit-file-row:hover { background: rgba(255, 255, 255, 0.04); }
+.commit-file-row input[type="checkbox"] { margin: 0; }
+.commit-file-path {
+  font-family: 'SF Mono', Menlo, monospace;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .commit-progress {
   display: inline-flex;
   align-items: center;
@@ -1605,6 +1744,11 @@ body.reduced-motion *, body.reduced-motion *::before, body.reduced-motion *::aft
 }
 .modified-file-actions { display: flex; gap: 4px; align-items: center; }
 .modified-file-actions .btn { padding: 3px 8px; font-size: 11px; }
+.modified-file-actions .btn-discard:hover {
+  color: #ffffff;
+  background: rgba(220, 38, 38, 0.85);
+  border-color: rgba(220, 38, 38, 0.95);
+}
 .staged-tag {
   font-size: 9px;
   text-transform: uppercase;

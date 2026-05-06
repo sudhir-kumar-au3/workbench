@@ -3,6 +3,7 @@ import { notify } from './notify.js';
 import { openDiff } from './diffModal.js';
 import { openCommitModal } from './commitModal.js';
 import { loadStatusFor } from './statuses.js';
+import { openConflictsModal } from './conflictsModal.js';
 
 const KIND_LABEL = {
   M: 'Modified',
@@ -25,6 +26,13 @@ function joinPath(base, rel) {
 //  - 'unknown'    → couldn't classify; show raw output
 function classifyError(message) {
   const m = (message || '').toLowerCase();
+  if (
+    m.includes('conflict (content)') ||
+    m.includes('conflict (modify/delete)') ||
+    m.includes('fix conflicts and then commit') ||
+    m.includes('could not apply') ||
+    m.includes('after resolving the conflicts')
+  ) return 'conflict';
   if (
     m.includes('your local changes') ||
     m.includes('would be overwritten') ||
@@ -60,6 +68,7 @@ const OP_LABEL = {
 const KIND_TITLES = {
   dirty: 'Working tree has uncommitted changes',
   divergent: 'Branch has diverged from upstream',
+  conflict: 'Merge conflicts need resolution',
   auth: 'Authentication or permission denied',
   unknown: 'Operation failed',
 };
@@ -67,6 +76,7 @@ const KIND_TITLES = {
 const KIND_SUMMARIES = {
   dirty: 'Git refused the operation because the working tree has changes that would be lost or that conflict with incoming commits. Stash, commit, or revert these files and try again.',
   divergent: 'Your branch and the upstream have commits that aren\'t in each other. A fast-forward isn\'t possible — you need to rebase (or merge) and then push.',
+  conflict: 'Resolve the conflicting files, mark each as resolved, then continue the operation.',
   auth: 'Git couldn\'t authenticate to the remote. Check your SSH key, credentials, or repository access.',
   unknown: 'Git reported an error. Full output is below.',
 };
@@ -174,6 +184,11 @@ function buildActions(actionsEl, ctx) {
 
 export async function openGitFailure({ op, worktreePath, label, error, retry }) {
   const kind = classifyError(error);
+  // Conflict failures get the dedicated resolution UI instead of the generic dialog.
+  if (kind === 'conflict') {
+    openConflictsModal(label || worktreePath.split('/').pop(), worktreePath);
+    return;
+  }
   $('#git-failure-title').textContent = `${OP_LABEL[op] || 'Operation'} failed — ${KIND_TITLES[kind]}`;
   $('#git-failure-meta').textContent = worktreePath;
   $('#git-failure-summary').textContent = KIND_SUMMARIES[kind];

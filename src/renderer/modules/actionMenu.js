@@ -5,6 +5,8 @@ import { openCommitModal } from './commitModal.js';
 import { loadStatusFor } from './statuses.js';
 import { restoreOutput } from './runs.js';
 import { openGitFailure } from './gitFailureModal.js';
+import { openHistoryModal } from './historyModal.js';
+import { openConflictsModal } from './conflictsModal.js';
 
 let openMenu = null;
 
@@ -45,7 +47,9 @@ function buildItems(card) {
 
   const items = [
     { label: 'Open diff', run: () => openDiff(`${repoLabel} — diff`, worktreePath) },
+    { label: 'Show history…', run: () => openHistoryModal(repoLabel, worktreePath) },
     { label: 'Commit + push…', run: () => openCommitModal(repoLabel, worktreePath) },
+    { label: 'Resolve conflicts…', run: () => openConflictsModal(repoLabel, worktreePath) },
     { sep: true },
   ];
 

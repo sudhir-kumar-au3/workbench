@@ -6,6 +6,7 @@ import { loadAllStatuses } from './statuses.js';
 import { showToast } from './bulkGitToast.js';
 import { notify } from './notify.js';
 import { openGitFailure } from './gitFailureModal.js';
+import { refreshPrChips } from './memberCard.js';
 
 const OP_DISPLAY_TO_KIND = {
   fetch: 'pull',  // fetch failures are basically network/auth — group with pull
@@ -56,7 +57,12 @@ async function runBulkOp(op, label) {
 }
 
 export function setupWorkspaceToolbar({ openMetadataModal }) {
-  $('#ws-refresh').addEventListener('click', () => loadAllStatuses());
+  $('#ws-refresh').addEventListener('click', async () => {
+    // Explicit refresh: bust the PR cache so chips re-query GitHub.
+    await globalThis.api.git.clearPrCache(null).catch(() => {});
+    loadAllStatuses();
+    refreshPrChips();
+  });
   $('#ws-fetch').addEventListener('click', () => runBulkOp('fetch', 'Fetch'));
   $('#ws-pull').addEventListener('click', () => runBulkOp('pull', 'Pull (--ff-only)'));
   $('#ws-sync').addEventListener('click', async () => {

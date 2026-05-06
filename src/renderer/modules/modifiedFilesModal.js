@@ -1,6 +1,7 @@
 import { $, escapeHtml } from './utils.js';
 import { notify } from './notify.js';
 import { openDiff } from './diffModal.js';
+import { loadStatusFor } from './statuses.js';
 
 const KIND_LABEL = {
   M: 'Modified',
@@ -43,6 +44,7 @@ function renderRows(files, worktreePath) {
         ${stagedTag}
         <button class="btn btn-ghost" data-action="copy" title="Copy full path">⧉</button>
         <button class="btn btn-ghost" data-action="open" title="Open in editor">↗</button>
+        <button class="btn btn-ghost btn-discard" data-action="discard" title="Discard changes (irreversible)">⌫</button>
       </div>
     `;
     row.querySelector('[data-action="copy"]').addEventListener('click', async () => {
@@ -52,6 +54,21 @@ function renderRows(files, worktreePath) {
     row.querySelector('[data-action="open"]').addEventListener('click', async () => {
       try { await globalThis.api.editor.open(fullPath); }
       catch (e) { notify.error(e.message); }
+    });
+    row.querySelector('[data-action="discard"]').addEventListener('click', async () => {
+      const isUntracked = f.kind === 'untracked';
+      const verb = isUntracked ? 'Delete the untracked file' : 'Discard changes to';
+      if (!confirm(`${verb}\n\n${f.path}\n\nThis cannot be undone.`)) return;
+      try {
+        await globalThis.api.git.discardFile(worktreePath, f.path, isUntracked);
+        notify.success(isUntracked ? 'File deleted' : 'Changes discarded');
+        // Re-fetch the file list and the card status.
+        const fresh = await globalThis.api.worktrees.statusFiles(worktreePath);
+        renderRows(Array.isArray(fresh) ? fresh : [], worktreePath);
+        loadStatusFor(worktreePath);
+      } catch (e) {
+        notify.error(e.message);
+      }
     });
     list.appendChild(row);
   }

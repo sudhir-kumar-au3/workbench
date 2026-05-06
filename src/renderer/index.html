@@ -286,6 +286,34 @@
     </div>
   </div>
 
+  <!-- Commit history viewer -->
+  <div id="history-modal" class="modal hidden">
+    <div class="modal-content modal-wide">
+      <div class="modal-header-row">
+        <h2 id="history-title">History</h2>
+        <span class="muted" id="history-meta"></span>
+      </div>
+      <input type="text" id="history-filter" placeholder="Filter by message, author, hash…" class="history-filter" />
+      <div id="history-list" class="history-list"></div>
+      <div class="modal-actions">
+        <button id="history-close" class="btn btn-primary">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Conflicts resolution -->
+  <div id="conflicts-modal" class="modal hidden">
+    <div class="modal-content modal-wide">
+      <div class="modal-header-row">
+        <h2 id="conflicts-title">Resolve conflicts</h2>
+        <span class="muted" id="conflicts-meta"></span>
+      </div>
+      <p class="git-failure-summary" id="conflicts-summary"></p>
+      <div id="conflicts-list" class="modified-files-list"></div>
+      <div class="modal-actions" id="conflicts-actions"></div>
+    </div>
+  </div>
+
   <!-- Diff viewer -->
   <div id="diff-modal" class="modal hidden">
     <div class="modal-content modal-wide">
@@ -302,9 +330,19 @@
 
   <!-- Commit + push -->
   <div id="commit-modal" class="modal hidden">
-    <div class="modal-content">
+    <div class="modal-content modal-wide">
       <h2 id="commit-title">Commit</h2>
       <p class="hint" id="commit-meta"></p>
+
+      <div class="commit-files-header">
+        <span class="muted" id="commit-files-summary">Files</span>
+        <div class="commit-files-controls">
+          <button type="button" class="btn btn-ghost" id="commit-files-all">All</button>
+          <button type="button" class="btn btn-ghost" id="commit-files-none">None</button>
+        </div>
+      </div>
+      <div id="commit-files-list" class="commit-files-list"></div>
+
       <label>Message
         <textarea id="commit-message" rows="3" placeholder="Brief description of the change"></textarea>
       </label>

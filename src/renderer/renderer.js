@@ -18,6 +18,8 @@ import { setupDiffModal } from './modules/diffModal.js';
 import { setupModifiedFilesModal } from './modules/modifiedFilesModal.js';
 import { setupCommitModal } from './modules/commitModal.js';
 import { setupGitFailureModal } from './modules/gitFailureModal.js';
+import { setupHistoryModal } from './modules/historyModal.js';
+import { setupConflictsModal } from './modules/conflictsModal.js';
 import { setupShowArchivedToggle } from './modules/archivedToggle.js';
 
 attachRunListeners();
@@ -39,5 +41,7 @@ setupDiffModal();
 setupModifiedFilesModal();
 setupCommitModal();
 setupGitFailureModal();
+setupHistoryModal();
+setupConflictsModal();
 setupShowArchivedToggle();
 refresh();

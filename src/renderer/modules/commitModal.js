@@ -1,9 +1,20 @@
-import { $ } from './utils.js';
+import { $, escapeHtml } from './utils.js';
 import { notify } from './notify.js';
 import { loadStatusFor } from './statuses.js';
 import { openGitFailure } from './gitFailureModal.js';
 
+const KIND_CLASS = {
+  M: 'kind-M',
+  A: 'kind-A',
+  D: 'kind-D',
+  R: 'kind-R',
+  C: 'kind-C',
+  U: 'kind-U',
+  untracked: 'kind-untracked',
+};
+
 let currentTarget = null;
+let currentFiles = [];
 
 function setProgress(text, kind = 'busy') {
   const el = $('#commit-progress');
@@ -25,7 +36,58 @@ function setBusy(busy, label = 'Commit') {
   $('#commit-confirm').textContent = label;
 }
 
-export function openCommitModal(label, worktreePath) {
+function selectedPaths() {
+  return Array.from($('#commit-files-list').querySelectorAll('input[type="checkbox"]:checked'))
+    .map(cb => cb.dataset.path);
+}
+
+function updateSummary() {
+  const total = currentFiles.length;
+  const checked = selectedPaths().length;
+  const summary = $('#commit-files-summary');
+  if (total === 0) {
+    summary.textContent = 'No changes to commit';
+  } else if (checked === total) {
+    summary.textContent = `All ${total} file${total === 1 ? '' : 's'} selected`;
+  } else {
+    summary.textContent = `${checked} of ${total} file${total === 1 ? '' : 's'} selected`;
+  }
+}
+
+function renderFiles() {
+  const list = $('#commit-files-list');
+  list.innerHTML = '';
+  if (currentFiles.length === 0) {
+    list.innerHTML = '<div class="empty-row">No changes in the working tree.</div>';
+    updateSummary();
+    return;
+  }
+  for (const f of currentFiles) {
+    const row = document.createElement('label');
+    row.className = 'commit-file-row';
+    const kindClass = KIND_CLASS[f.kind] || '';
+    row.innerHTML = `
+      <input type="checkbox" data-path="${escapeHtml(f.path)}" checked />
+      <span class="modified-file-status ${kindClass}" title="${escapeHtml(f.code)}">${escapeHtml(f.code.replace(/ /g, '·'))}</span>
+      <span class="commit-file-path" title="${escapeHtml(f.path)}">${escapeHtml(f.path)}</span>
+    `;
+    row.querySelector('input').addEventListener('change', updateSummary);
+    list.appendChild(row);
+  }
+  updateSummary();
+}
+
+async function loadFiles(worktreePath) {
+  try {
+    const result = await globalThis.api.worktrees.statusFiles(worktreePath);
+    currentFiles = Array.isArray(result) ? result : [];
+  } catch {
+    currentFiles = [];
+  }
+  renderFiles();
+}
+
+export async function openCommitModal(label, worktreePath) {
   currentTarget = worktreePath;
   $('#commit-title').textContent = `Commit — ${label}`;
   $('#commit-meta').textContent = worktreePath;
@@ -34,8 +96,12 @@ export function openCommitModal(label, worktreePath) {
   $('#commit-error').textContent = '';
   setProgress('');
   setBusy(false);
+  currentFiles = [];
+  $('#commit-files-list').innerHTML = '<div class="empty-row">Loading…</div>';
+  $('#commit-files-summary').textContent = 'Files';
   $('#commit-modal').classList.remove('hidden');
   setTimeout(() => $('#commit-message').focus(), 50);
+  await loadFiles(worktreePath);
 }
 
 async function confirm() {
@@ -44,17 +110,26 @@ async function confirm() {
   errEl.textContent = '';
   if (!message) { errEl.textContent = 'Message is required.'; return; }
   if (!currentTarget) return;
+  const paths = selectedPaths();
+  if (currentFiles.length > 0 && paths.length === 0) {
+    errEl.textContent = 'Select at least one file to commit.';
+    return;
+  }
   const willPush = $('#commit-push').checked;
   const target = currentTarget;
   const titleLabel = ($('#commit-title').textContent || '').replace(/^Commit\s*—\s*/, '').trim() || target.split('/').pop();
+  const allSelected = paths.length === currentFiles.length;
 
   try {
     setBusy(true, 'Committing…');
     setProgress('Committing…');
     try {
-      await globalThis.api.git.commitAll(target, message);
+      if (allSelected) {
+        await globalThis.api.git.commitAll(target, message);
+      } else {
+        await globalThis.api.git.commitFiles(target, message, paths);
+      }
     } catch (e) {
-      // Commit failures are usually about hooks or message format — keep inline.
       errEl.textContent = e.message;
       setProgress('');
       return;
@@ -66,7 +141,6 @@ async function confirm() {
       const results = await globalThis.api.git.bulkOp('push', [target]);
       const r = results[0];
       if (!r.ok) {
-        // Commit succeeded; surface the push failure in the rich diagnostic dialog.
         $('#commit-modal').classList.add('hidden');
         loadStatusFor(target);
         openGitFailure({
@@ -100,5 +174,13 @@ export function setupCommitModal() {
       e.preventDefault();
       confirm();
     }
+  });
+  $('#commit-files-all').addEventListener('click', () => {
+    $('#commit-files-list').querySelectorAll('input[type="checkbox"]').forEach(cb => { cb.checked = true; });
+    updateSummary();
+  });
+  $('#commit-files-none').addEventListener('click', () => {
+    $('#commit-files-list').querySelectorAll('input[type="checkbox"]').forEach(cb => { cb.checked = false; });
+    updateSummary();
   });
 }

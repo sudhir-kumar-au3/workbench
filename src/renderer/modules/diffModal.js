@@ -30,6 +30,15 @@ export async function openDiff(label, worktreePath) {
   }
 }
 
+// Show a pre-fetched diff (e.g. for a single commit) without re-running git diff.
+export function showRawDiff(label, diffText, worktreePath = '') {
+  $('#diff-title').textContent = label;
+  $('#diff-meta').textContent = worktreePath;
+  const body = $('#diff-body');
+  body.innerHTML = diffText.trim() ? colorize(diffText) : '<span class="muted">No changes.</span>';
+  $('#diff-modal').classList.remove('hidden');
+}
+
 export function setupDiffModal() {
   $('#diff-close').addEventListener('click', () => $('#diff-modal').classList.add('hidden'));
 }

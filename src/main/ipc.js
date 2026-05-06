@@ -202,6 +202,60 @@ function registerHandlers({ settingsStore, runsStore, commandRunner, watcherRegi
     assertNonEmptyString(message, 'message');
     return git.commitAll(worktreePath, message);
   });
+  ipcMain.handle('git:commitFiles', (_e, worktreePath, message, paths) => {
+    assertNonEmptyString(worktreePath, 'worktreePath');
+    assertNonEmptyString(message, 'message');
+    if (!Array.isArray(paths)) throw new TypeError('paths must be an array');
+    for (const p of paths) assertNonEmptyString(p, 'path');
+    return git.commitFiles(worktreePath, message, paths);
+  });
+  ipcMain.handle('git:discardFile', (_e, worktreePath, file, isUntracked) => {
+    assertNonEmptyString(worktreePath, 'worktreePath');
+    assertNonEmptyString(file, 'file');
+    return git.discardFile(worktreePath, file, !!isUntracked);
+  });
+  ipcMain.handle('git:log', (_e, worktreePath, limit) => {
+    assertNonEmptyString(worktreePath, 'worktreePath');
+    return git.log(worktreePath, typeof limit === 'number' ? limit : 50);
+  });
+  ipcMain.handle('git:diffOfCommit', (_e, worktreePath, hash) => {
+    assertNonEmptyString(worktreePath, 'worktreePath');
+    assertNonEmptyString(hash, 'hash');
+    return git.diffOfCommit(worktreePath, hash);
+  });
+  ipcMain.handle('git:conflictState', (_e, worktreePath) => {
+    assertNonEmptyString(worktreePath, 'worktreePath');
+    return git.conflictState(worktreePath);
+  });
+  ipcMain.handle('git:markResolved', (_e, worktreePath, file) => {
+    assertNonEmptyString(worktreePath, 'worktreePath');
+    assertNonEmptyString(file, 'file');
+    return git.markResolved(worktreePath, file);
+  });
+  ipcMain.handle('git:continueRebase', (_e, worktreePath) => {
+    assertNonEmptyString(worktreePath, 'worktreePath');
+    return git.continueRebase(worktreePath);
+  });
+  ipcMain.handle('git:abortRebase', (_e, worktreePath) => {
+    assertNonEmptyString(worktreePath, 'worktreePath');
+    return git.abortRebase(worktreePath);
+  });
+  ipcMain.handle('git:continueMerge', (_e, worktreePath) => {
+    assertNonEmptyString(worktreePath, 'worktreePath');
+    return git.continueMerge(worktreePath);
+  });
+  ipcMain.handle('git:abortMerge', (_e, worktreePath) => {
+    assertNonEmptyString(worktreePath, 'worktreePath');
+    return git.abortMerge(worktreePath);
+  });
+  ipcMain.handle('git:prForBranch', (_e, worktreePath) => {
+    assertNonEmptyString(worktreePath, 'worktreePath');
+    return git.prForBranch(worktreePath);
+  });
+  ipcMain.handle('git:clearPrCache', (_e, worktreePath) => {
+    git.clearPrCache(worktreePath || null);
+    return true;
+  });
   ipcMain.handle('git:stash', (_e, worktreePath, message) => {
     assertNonEmptyString(worktreePath, 'worktreePath');
     return git.stash(worktreePath, message || '');

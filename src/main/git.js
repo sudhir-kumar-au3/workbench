@@ -207,6 +207,162 @@ async function commitAll(worktreePath, message) {
   return gitExec(worktreePath, ['commit', '-m', message]);
 }
 
+// Commit only the given file paths (plus any already-staged content).
+// Files NOT in the list are unstaged first so a partial commit lands cleanly.
+async function commitFiles(worktreePath, message, paths) {
+  if (!message?.trim()) throw new Error('Commit message is required.');
+  if (!Array.isArray(paths) || paths.length === 0) {
+    throw new Error('Select at least one file to commit.');
+  }
+  // Reset index to working tree so staging starts clean. Safer than tracking each
+  // checkbox's prior staged/unstaged state — the user's checked set IS the index.
+  await gitExec(worktreePath, ['reset', '--mixed', '--quiet']).catch(() => {});
+  // Stage only the chosen paths. `--` separates pathspecs from refs.
+  await gitExec(worktreePath, ['add', '--', ...paths]);
+  return gitExec(worktreePath, ['commit', '-m', message]);
+}
+
+async function discardFile(worktreePath, file, isUntracked) {
+  if (!file) throw new Error('No file specified.');
+  if (isUntracked) {
+    // Untracked → just remove. `clean -f --` accepts a pathspec.
+    return gitExec(worktreePath, ['clean', '-fd', '--', file]);
+  }
+  // Tracked → restore both index and worktree to HEAD.
+  return gitExec(worktreePath, ['restore', '--source=HEAD', '--staged', '--worktree', '--', file]);
+}
+
+async function log(worktreePath, limit = 50) {
+  // Use a unit separator we won't see in git output to split fields.
+  const SEP = '';
+  const REC = '';
+  const fmt = ['%H', '%h', '%an', '%ae', '%ad', '%s'].join(SEP) + REC;
+  const out = await gitExec(worktreePath, [
+    'log',
+    `--pretty=format:${fmt}`,
+    '--date=iso-strict',
+    `-n${Math.max(1, Math.min(500, limit))}`,
+  ]);
+  return out.split(REC).map(s => s.trim()).filter(Boolean).map(line => {
+    const [hash, shortHash, authorName, authorEmail, date, ...rest] = line.split(SEP);
+    return {
+      hash,
+      shortHash,
+      authorName,
+      authorEmail,
+      date,
+      message: rest.join(SEP),
+    };
+  });
+}
+
+async function diffOfCommit(worktreePath, hash) {
+  return gitExec(worktreePath, ['show', '--stat', '--patch', hash]);
+}
+
+// Detect in-progress merge / rebase state and the conflicted file list.
+async function conflictState(worktreePath) {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const gitDirOut = await gitExec(worktreePath, ['rev-parse', '--git-dir']).catch(() => '');
+  const gitDir = gitDirOut.trim();
+  if (!gitDir) return { kind: null, files: [] };
+  const abs = path.isAbsolute(gitDir) ? gitDir : path.join(worktreePath, gitDir);
+  let kind = null;
+  if (fs.existsSync(path.join(abs, 'MERGE_HEAD'))) kind = 'merge';
+  else if (fs.existsSync(path.join(abs, 'rebase-merge')) || fs.existsSync(path.join(abs, 'rebase-apply'))) kind = 'rebase';
+  else if (fs.existsSync(path.join(abs, 'CHERRY_PICK_HEAD'))) kind = 'cherry-pick';
+  // List conflicted files via porcelain status (UU, AA, DD, etc. in the unmerged class).
+  const out = await gitExec(worktreePath, ['status', '--porcelain']).catch(() => '');
+  const files = [];
+  for (const line of out.split('\n')) {
+    if (!line) continue;
+    const code = line.slice(0, 2);
+    const file = line.slice(3);
+    // Unmerged entries have any combination of U / AA / DD / AU / UA / DU / UD.
+    if (code === 'UU' || code === 'AA' || code === 'DD' || code.includes('U')) {
+      files.push({ code: code.trim(), path: file });
+    }
+  }
+  if (files.length > 0 && !kind) kind = 'merge'; // best-effort fallback
+  return { kind, files };
+}
+
+async function markResolved(worktreePath, file) {
+  return gitExec(worktreePath, ['add', '--', file]);
+}
+
+async function continueRebase(worktreePath) {
+  return gitExec(worktreePath, ['rebase', '--continue']);
+}
+async function abortRebase(worktreePath) {
+  return gitExec(worktreePath, ['rebase', '--abort']);
+}
+async function continueMerge(worktreePath) {
+  // `merge --continue` is the modern equivalent; falls back to commit if needed.
+  return gitExec(worktreePath, ['merge', '--continue']);
+}
+async function abortMerge(worktreePath) {
+  return gitExec(worktreePath, ['merge', '--abort']);
+}
+
+// PR lookup via the GitHub `gh` CLI. Silently returns null if gh isn't installed
+// or the worktree isn't a GitHub-hosted repo.
+//
+// Two caches make this cheap to call repeatedly:
+//  - ghAvailablePromise: memoized for the session (gh's presence doesn't change)
+//  - prCache: keyed by (worktreePath, branch), 60s TTL — workspace switches and
+//    re-renders no longer refetch PRs on every card.
+let ghAvailablePromise = null;
+function ghAvailable() {
+  if (ghAvailablePromise) return ghAvailablePromise;
+  ghAvailablePromise = new Promise((resolve) => {
+    execFile('gh', ['--version'], { timeout: 1500 }, (err) => resolve(!err));
+  });
+  return ghAvailablePromise;
+}
+
+const PR_CACHE_TTL_MS = 60_000;
+const prCache = new Map();
+
+function clearPrCache(worktreePath) {
+  if (!worktreePath) { prCache.clear(); return; }
+  // Drop all entries that begin with `<worktreePath>::` (any branch).
+  const prefix = `${worktreePath}::`;
+  for (const key of prCache.keys()) {
+    if (key.startsWith(prefix)) prCache.delete(key);
+  }
+}
+
+async function prForBranch(worktreePath) {
+  const ok = await ghAvailable();
+  if (!ok) return null;
+  const branch = (await gitExec(worktreePath, ['symbolic-ref', '--short', 'HEAD']).catch(() => '')).trim();
+  if (!branch) return null;
+
+  const key = `${worktreePath}::${branch}`;
+  const cached = prCache.get(key);
+  if (cached && Date.now() - cached.t < PR_CACHE_TTL_MS) return cached.value;
+
+  const value = await new Promise((resolve) => {
+    execFile(
+      'gh',
+      ['pr', 'list', '--head', branch, '--json', 'number,title,url,state', '--limit', '1'],
+      { cwd: worktreePath, env: cleanEnv(), timeout: 4000 },
+      (err, stdout) => {
+        if (err) { resolve(null); return; }
+        try {
+          const list = JSON.parse(stdout || '[]');
+          resolve(list[0] || null);
+        } catch { resolve(null); }
+      },
+    );
+  });
+
+  prCache.set(key, { t: Date.now(), value });
+  return value;
+}
+
 async function stash(worktreePath, message) {
   const args = ['stash', 'push', '--include-untracked'];
   if (message?.trim()) args.push('-m', message.trim());
@@ -262,6 +418,18 @@ module.exports = {
   rebaseOnUpstream,
   diff,
   commitAll,
+  commitFiles,
+  discardFile,
+  log,
+  diffOfCommit,
+  conflictState,
+  markResolved,
+  continueRebase,
+  abortRebase,
+  continueMerge,
+  abortMerge,
+  prForBranch,
+  clearPrCache,
   stash,
   stashPop,
   stashList,
