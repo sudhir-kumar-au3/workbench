@@ -39,6 +39,10 @@ const MIGRATIONS = [
       if (typeof ws.notes !== 'string') ws.notes = '';
     }
   },
+  // v4: showResourceStats — display CPU/memory chip on running output panel.
+  function v4(data) {
+    if (typeof data.showResourceStats !== 'boolean') data.showResourceStats = true;
+  },
 ];
 
 function applyMigrations(data) {
@@ -93,6 +97,7 @@ function createStores(userDataDir) {
       accentColor: 'indigo',
       reducedMotion: false,
       showArchived: false,
+      showResourceStats: true,
       workspacesRoot: path.join(os.homedir(), 'worktrees'),
       repos: [],
       workspaces: [],
@@ -101,8 +106,35 @@ function createStores(userDataDir) {
   );
 
   const runsBase = makeStore(path.join(userDataDir, 'runs.json'), {}, false);
+  const RUNS_MAX_ENTRIES = 200; // total (worktree, command) pairs to keep
+  function capEntries(data) {
+    const flat = [];
+    for (const [wp, byCmd] of Object.entries(data)) {
+      if (!byCmd || typeof byCmd !== 'object' || Array.isArray(byCmd?.lines)) continue;
+      for (const [cmd, run] of Object.entries(byCmd)) {
+        flat.push({ wp, cmd, ranAt: run?.ranAt || '' });
+      }
+    }
+    if (flat.length <= RUNS_MAX_ENTRIES) return false;
+    flat.sort((a, b) => a.ranAt.localeCompare(b.ranAt));
+    const drop = flat.length - RUNS_MAX_ENTRIES;
+    for (let i = 0; i < drop; i++) {
+      const { wp, cmd } = flat[i];
+      if (data[wp]) {
+        delete data[wp][cmd];
+        if (Object.keys(data[wp]).length === 0) delete data[wp];
+      }
+    }
+    return true;
+  }
   const runsStore = {
     read: runsBase.read,
+    forWorktree(worktreePath) {
+      const data = runsBase.read();
+      const entry = data[worktreePath];
+      if (!entry || Array.isArray(entry?.lines)) return entry?.lines ? { test: entry } : {};
+      return entry;
+    },
     save(worktreePath, commandName, run) {
       const data = runsBase.read();
       if (!data[worktreePath] || Array.isArray(data[worktreePath].lines)) {
@@ -110,6 +142,7 @@ function createStores(userDataDir) {
         data[worktreePath] = old?.lines ? { test: old } : {};
       }
       data[worktreePath][commandName] = run;
+      capEntries(data);
       runsBase.write(data);
     },
     remove(worktreePaths) {
@@ -119,6 +152,26 @@ function createStores(userDataDir) {
         if (p in data) { delete data[p]; changed = true; }
       }
       if (changed) runsBase.write(data);
+    },
+    setDismissed(worktreePath, commandName, dismissed) {
+      const data = runsBase.read();
+      const entry = data[worktreePath]?.[commandName];
+      if (!entry || Array.isArray(entry)) return;
+      entry.dismissed = !!dismissed;
+      runsBase.write(data);
+    },
+    pruneStale() {
+      const data = runsBase.read();
+      let changed = false;
+      for (const wp of Object.keys(data)) {
+        if (!fs.existsSync(wp)) {
+          delete data[wp];
+          changed = true;
+        }
+      }
+      if (capEntries(data)) changed = true;
+      if (changed) runsBase.write(data);
+      return changed;
     },
   };
 

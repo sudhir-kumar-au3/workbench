@@ -8,6 +8,7 @@ export const state = {
     accentColor: 'indigo',
     reducedMotion: false,
     showArchived: false,
+    showResourceStats: true,
   },
   repos: [],
   workspaces: [],

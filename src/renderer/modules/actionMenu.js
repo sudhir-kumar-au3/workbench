@@ -1,7 +1,9 @@
+import { state } from './state.js';
 import { notify } from './notify.js';
 import { openDiff } from './diffModal.js';
 import { openCommitModal } from './commitModal.js';
 import { loadAllStatuses } from './statuses.js';
+import { restoreOutput } from './runs.js';
 
 let openMenu = null;
 
@@ -33,10 +35,37 @@ function buildItems(card) {
   const branch = branchEl ? branchEl.firstChild.nodeValue.trim() : '';
   const repoLabel = card.querySelector('.member-name')?.firstChild?.textContent?.trim() || 'repo';
 
-  return [
+  const savedForWorktree = state.savedRuns[worktreePath];
+  const lastRun = savedForWorktree
+    ? Object.entries(savedForWorktree)
+        .filter(([, v]) => v?.lines)
+        .sort(([, a], [, b]) => (b.ranAt || '').localeCompare(a.ranAt || ''))[0]
+    : null;
+
+  const items = [
     { label: 'Open diff', run: () => openDiff(`${repoLabel} — diff`, worktreePath) },
     { label: 'Commit + push…', run: () => openCommitModal(repoLabel, worktreePath) },
     { sep: true },
+  ];
+
+  if (lastRun) {
+    const [lastCmd, lastEntry] = lastRun;
+    items.push({
+      label: `Show last output (${lastCmd})`,
+      run: async () => {
+        if (lastEntry.dismissed) {
+          await globalThis.api.runs.setDismissed(worktreePath, lastCmd, false);
+          lastEntry.dismissed = false;
+        }
+        restoreOutput(card, lastCmd, lastEntry);
+        const panel = card.querySelector('.test-output');
+        panel?.classList.remove('collapsed');
+      },
+    });
+    items.push({ sep: true });
+  }
+
+  items.push(
     {
       label: 'Fast-forward (pull --ff-only)',
       run: async () => {
@@ -61,7 +90,8 @@ function buildItems(card) {
     { sep: true },
     { label: 'Copy worktree path', run: () => copy(worktreePath, 'path') },
     { label: 'Copy branch name', run: () => copy(branch, 'branch') },
-  ];
+  );
+  return items;
 }
 
 export function showActionMenu(triggerBtn, card) {

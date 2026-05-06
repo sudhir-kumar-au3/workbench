@@ -4,6 +4,7 @@ const log = require('electron-log/main');
 const { createStores } = require('./main/store');
 const { CommandRunner } = require('./main/testRunner');
 const { WatcherRegistry } = require('./main/watcher');
+const { ProcessStatsPoller } = require('./main/processStats');
 const { registerHandlers } = require('./main/ipc');
 
 log.initialize();
@@ -16,6 +17,7 @@ process.on('unhandledRejection', (err) => log.error('unhandledRejection', err));
 
 let mainWindow = null;
 let watcherRegistry = null;
+let statsPoller = null;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -35,7 +37,13 @@ function createWindow() {
 
 app.whenReady().then(() => {
   const { settingsStore, runsStore } = createStores(app.getPath('userData'));
-  const commandRunner = new CommandRunner(runsStore);
+  // One-shot GC of run history: drop entries for worktrees that no longer exist on disk
+  // and cap total entries. Cheap (one disk read + N stat calls) and only on app start.
+  try {
+    if (runsStore.pruneStale()) log.info('runs.json pruned at startup');
+  } catch (e) { log.warn('runs.json prune failed', e); }
+  statsPoller = new ProcessStatsPoller();
+  const commandRunner = new CommandRunner(runsStore, statsPoller);
   watcherRegistry = new WatcherRegistry();
   registerHandlers({
     settingsStore,
@@ -52,7 +60,11 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   watcherRegistry?.stopAll();
+  statsPoller?.stopAll();
   if (process.platform !== 'darwin') app.quit();
 });
 
-app.on('before-quit', () => watcherRegistry?.stopAll());
+app.on('before-quit', () => {
+  watcherRegistry?.stopAll();
+  statsPoller?.stopAll();
+});

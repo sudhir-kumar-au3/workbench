@@ -57,8 +57,12 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.invoke('runs:start', runId, worktreePath, commandName, command),
     stop: (runId) => ipcRenderer.invoke('runs:stop', runId),
     all: () => ipcRenderer.invoke('runs:all'),
+    forWorktree: (worktreePath) => ipcRenderer.invoke('runs:forWorktree', worktreePath),
+    setDismissed: (worktreePath, commandName, dismissed) =>
+      ipcRenderer.invoke('runs:setDismissed', worktreePath, commandName, dismissed),
     onOutput: (cb) => ipcRenderer.on('runs:output', (_e, runId, stream, data) => cb(runId, stream, data)),
     onExit: (cb) => ipcRenderer.on('runs:exit', (_e, runId, code) => cb(runId, code)),
+    onStats: (cb) => ipcRenderer.on('runs:stats', (_e, runId, stats) => cb(runId, stats)),
   },
   watch: {
     start: (key, worktreePath) => ipcRenderer.invoke('watch:start', key, worktreePath),

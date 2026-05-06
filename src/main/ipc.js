@@ -21,10 +21,11 @@ function registerHandlers({ settingsStore, runsStore, commandRunner, watcherRegi
       accentColor: data.accentColor || 'indigo',
       reducedMotion: !!data.reducedMotion,
       showArchived: !!data.showArchived,
+      showResourceStats: data.showResourceStats !== false,
     };
   });
   ipcMain.handle('settings:setPref', (_e, key, value) => {
-    const allowed = ['compactMode', 'sidebarCollapsed', 'accentColor', 'reducedMotion', 'showArchived'];
+    const allowed = ['compactMode', 'sidebarCollapsed', 'accentColor', 'reducedMotion', 'showArchived', 'showResourceStats'];
     if (!allowed.includes(key)) throw new TypeError(`Unknown pref: ${key}`);
     const data = settingsStore.read();
     data[key] = value;
@@ -235,6 +236,14 @@ function registerHandlers({ settingsStore, runsStore, commandRunner, watcherRegi
     commandRunner.start(runId, worktreePath, commandName, command, event.sender));
   ipcMain.handle('runs:stop', (_e, runId) => { commandRunner.stop(runId); return true; });
   ipcMain.handle('runs:all', () => runsStore.read());
+  ipcMain.handle('runs:forWorktree', (_e, worktreePath) => {
+    if (typeof worktreePath !== 'string' || !worktreePath) return {};
+    return runsStore.forWorktree(worktreePath);
+  });
+  ipcMain.handle('runs:setDismissed', (_e, worktreePath, commandName, dismissed) => {
+    runsStore.setDismissed(worktreePath, commandName, dismissed);
+    return true;
+  });
 
   // Watch mode
   ipcMain.handle('watch:start', (event, key, worktreePath) => {

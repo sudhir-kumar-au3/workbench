@@ -5,6 +5,7 @@ export function applyDisplayPrefs() {
   document.body.classList.toggle('compact', !!state.settings.compactMode);
   document.body.classList.toggle('sidebar-collapsed', !!state.settings.sidebarCollapsed);
   document.body.classList.toggle('reduced-motion', !!state.settings.reducedMotion);
+  document.body.classList.toggle('hide-resource-stats', state.settings.showResourceStats === false);
   document.body.dataset.accent = state.settings.accentColor || 'indigo';
   const collapseBtn = $('#sidebar-collapse-toggle');
   if (collapseBtn) collapseBtn.textContent = state.settings.sidebarCollapsed ? '›' : '‹';

@@ -47,6 +47,26 @@ export function applyHighlight(bodyEl, query) {
   }
 }
 
+function findActiveRunIdForPanel(panel) {
+  for (const [id, r] of state.runs) if (r.panel === panel) return id;
+  return null;
+}
+
+function dismissPanel(card, panel) {
+  const cmdName = panel.dataset.lastCommand;
+  const worktreePath = card.dataset.worktreePath;
+  if (cmdName && worktreePath) {
+    globalThis.api.runs.setDismissed(worktreePath, cmdName, true).catch(() => {});
+    if (state.savedRuns[worktreePath]?.[cmdName]) {
+      state.savedRuns[worktreePath][cmdName].dismissed = true;
+    }
+  }
+  panel.remove();
+}
+
+const STOP_ICON_SVG = '<svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg>';
+const CLOSE_ICON_HTML = '×';
+
 export function ensureOutputPanel(card) {
   let panel = card.querySelector('.test-output');
   if (!panel) {
@@ -57,9 +77,10 @@ export function ensureOutputPanel(card) {
         <button class="btn btn-ghost output-collapse" data-collapse title="Collapse / expand output" aria-label="Collapse output">▾</button>
         <span class="muted" data-cmd-label></span>
         <span class="run-timer muted" data-timer></span>
+        <span class="run-stats muted hidden" data-stats title="CPU cores in use · resident memory"></span>
         <input type="text" placeholder="Filter output…" data-search />
         <button class="btn btn-ghost" data-rerun title="Re-run">↻</button>
-        <button class="btn btn-ghost" data-clear title="Clear output">×</button>
+        <button class="btn btn-ghost" data-close title="Close output panel" aria-label="Close output panel">${CLOSE_ICON_HTML}</button>
       </div>
       <div class="test-output-body" data-output-body></div>
     `;
@@ -67,9 +88,14 @@ export function ensureOutputPanel(card) {
     panel.querySelector('[data-search]').addEventListener('input', e => {
       applyHighlight(panel.querySelector('[data-output-body]'), e.target.value);
     });
-    panel.querySelector('[data-clear]').addEventListener('click', () => {
-      panel.querySelector('[data-output-body]').innerHTML = '';
-      panel.querySelector('[data-search]').value = '';
+    panel.querySelector('[data-close]').addEventListener('click', () => {
+      const activeRunId = findActiveRunIdForPanel(panel);
+      if (activeRunId) {
+        const run = state.runs.get(activeRunId);
+        if (run) run.dismissOnExit = true;
+        globalThis.api.runs.stop(activeRunId);
+      }
+      dismissPanel(card, panel);
     });
     panel.querySelector('[data-rerun]').addEventListener('click', () => {
       const cmdName = panel.dataset.lastCommand;
@@ -80,12 +106,58 @@ export function ensureOutputPanel(card) {
     panel.querySelector('[data-collapse]').addEventListener('click', () => {
       panel.classList.toggle('collapsed');
     });
-    // Clicking the command label is a second affordance for collapse/expand.
     panel.querySelector('[data-cmd-label]').addEventListener('click', () => {
       panel.classList.toggle('collapsed');
     });
   }
   return panel;
+}
+
+function formatRss(bytes) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '';
+  const mb = bytes / (1024 * 1024);
+  if (mb >= 1024) return `${(mb / 1024).toFixed(1)} GB`;
+  return `${Math.round(mb)} MB`;
+}
+
+export function renderRunStats(panel, stats) {
+  const el = panel.querySelector('[data-stats]');
+  if (!el) return;
+  if (state.settings?.showResourceStats === false) {
+    el.classList.add('hidden');
+    return;
+  }
+  if (!stats) {
+    el.classList.add('hidden');
+    el.textContent = '';
+    return;
+  }
+  if (stats.warming) {
+    el.classList.remove('hidden');
+    el.textContent = '… measuring';
+    return;
+  }
+  const cores = Number.isFinite(stats.cores) ? stats.cores : 0;
+  const coresStr = cores >= 10 ? cores.toFixed(0) : cores.toFixed(1);
+  const rss = formatRss(stats.rss);
+  el.classList.remove('hidden');
+  el.textContent = rss ? `${coresStr} cores · ${rss}` : `${coresStr} cores`;
+}
+
+function setCloseButtonRunning(panel, running) {
+  const btn = panel.querySelector('[data-close]');
+  if (!btn) return;
+  if (running) {
+    btn.innerHTML = STOP_ICON_SVG;
+    btn.classList.add('is-stop');
+    btn.title = 'Stop run and close';
+    btn.setAttribute('aria-label', 'Stop run and close');
+  } else {
+    btn.innerHTML = CLOSE_ICON_HTML;
+    btn.classList.remove('is-stop');
+    btn.title = 'Close output panel';
+    btn.setAttribute('aria-label', 'Close output panel');
+  }
 }
 
 function formatElapsed(ms) {
@@ -98,17 +170,28 @@ function formatElapsed(ms) {
 export function restoreOutput(card, commandName, saved) {
   const panel = ensureOutputPanel(card);
   panel.classList.remove('hidden');
-  panel.querySelector('[data-cmd-label]').textContent = `${commandName} • last run`;
+  panel.dataset.lastCommand = commandName;
+  const passed = saved.exitCode === 0;
+  const summary = passed
+    ? `✓ ${commandName} • last run`
+    : (saved.exitCode == null
+        ? `${commandName} • last run`
+        : `✗ ${commandName} • code ${saved.exitCode}`);
+  panel.querySelector('[data-cmd-label]').textContent = summary;
+  setCloseButtonRunning(panel, false);
   const body = panel.querySelector('[data-output-body]');
   body.innerHTML = '';
   for (const [stream, text] of saved.lines) appendOutput(body, stream, text);
   if (saved.exitCode !== null && saved.exitCode !== undefined) {
     const div = document.createElement('div');
-    div.className = saved.exitCode === 0 ? 'exit-success' : 'exit-fail';
+    div.className = passed ? 'exit-success' : 'exit-fail';
     const time = saved.ranAt ? ` (${new Date(saved.ranAt).toLocaleString()})` : '';
-    div.textContent = (saved.exitCode === 0 ? '✓ Passed' : `✗ Exited with code ${saved.exitCode}`) + time;
+    div.textContent = (passed ? '✓ Passed' : `✗ Exited with code ${saved.exitCode}`) + time;
     body.appendChild(div);
   }
+  // Restored passing runs come back collapsed (just the chip-style toolbar).
+  if (passed) panel.classList.add('collapsed');
+  else panel.classList.remove('collapsed');
 }
 
 function findRepoCommand(repoPath, commandName) {
@@ -132,8 +215,11 @@ export function runCommand(card, commandName, cmdBtn) {
 
     const panel = ensureOutputPanel(card);
     panel.classList.remove('hidden');
+    panel.classList.remove('collapsed');
     panel.dataset.lastCommand = commandName;
     panel.querySelector('[data-cmd-label]').textContent = `${commandName} • running`;
+    setCloseButtonRunning(panel, true);
+    renderRunStats(panel, { warming: true });
     const body = panel.querySelector('[data-output-body]');
     body.innerHTML = '';
 
@@ -162,7 +248,7 @@ export function runCommand(card, commandName, cmdBtn) {
 export function finishRun(runId, code) {
   const run = state.runs.get(runId);
   if (!run) return;
-  const { outputBody, panel, cmdBtn, commandName, startedAt, timerInterval, timerEl } = run;
+  const { outputBody, panel, cmdBtn, commandName, startedAt, timerInterval, timerEl, dismissOnExit, card } = run;
   if (timerInterval) clearInterval(timerInterval);
   const elapsed = startedAt ? formatElapsed(Date.now() - startedAt) : '';
   if (timerEl && elapsed) timerEl.textContent = elapsed;
@@ -174,7 +260,12 @@ export function finishRun(runId, code) {
   if (code === 0) cmdBtn.classList.add('flash-pass');
   else cmdBtn.classList.add('flash-fail');
   setTimeout(() => cmdBtn.classList.remove('flash-fail', 'flash-pass'), 800);
-  panel.querySelector('[data-cmd-label]').textContent = `${commandName} • last run`;
+  const summary = code === 0
+    ? `✓ ${commandName} • ${elapsed || 'done'}`
+    : `✗ ${commandName} • code ${code}${elapsed ? ` • ${elapsed}` : ''}`;
+  panel.querySelector('[data-cmd-label]').textContent = summary;
+  setCloseButtonRunning(panel, false);
+  renderRunStats(panel, null);
 
   cmdBtn.classList.remove('running');
   cmdBtn.textContent = commandName;
@@ -189,7 +280,22 @@ export function finishRun(runId, code) {
     globalThis.api.notify(`${commandName} ${status}`, `${ws} — ${run.card.dataset.worktreePath}`);
   }
 
-  globalThis.api.runs.all().then(r => { state.savedRuns = r; });
+  if (dismissOnExit) {
+    dismissPanel(card, panel);
+  } else if (code === 0) {
+    const delay = state.settings?.reducedMotion ? 0 : 1500;
+    setTimeout(() => {
+      if (!card.contains(panel)) return;
+      if (findActiveRunIdForPanel(panel)) return;
+      panel.classList.add('collapsed');
+    }, delay);
+  }
+
+  // Refresh only this worktree's saved runs, not the entire store.
+  const wp = run.card?.dataset.worktreePath;
+  if (wp) {
+    globalThis.api.runs.forWorktree(wp).then(r => { state.savedRuns[wp] = r || {}; });
+  }
   loadAllStatuses();
 }
 
@@ -199,4 +305,8 @@ export function attachRunListeners() {
     if (run) appendOutput(run.outputBody, stream, data);
   });
   globalThis.api.runs.onExit((runId, code) => finishRun(runId, code));
+  globalThis.api.runs.onStats?.((runId, stats) => {
+    const run = state.runs.get(runId);
+    if (run?.panel) renderRunStats(run.panel, stats);
+  });
 }

@@ -27,9 +27,10 @@ function detectDefaultCommands(repoPath) {
 }
 
 class CommandRunner {
-  constructor(runsStore) {
+  constructor(runsStore, statsPoller = null) {
     this.runs = new Map();
     this.runsStore = runsStore;
+    this.statsPoller = statsPoller;
   }
 
   start(runId, worktreePath, commandName, command, sender) {
@@ -63,23 +64,49 @@ class CommandRunner {
     };
     append('meta', `$ ${command}\n`);
 
+    // Coalesce stdout/stderr across a 16ms window (one frame). Each chunk from the child
+    // process is small; sending one IPC per chunk during a verbose build floods the main↔renderer
+    // bridge. We accumulate per-stream and flush on a single timer.
+    let pendingStdout = '';
+    let pendingStderr = '';
+    let flushTimer = null;
+    const FLUSH_MS = 16;
+    const flush = () => {
+      flushTimer = null;
+      if (pendingStdout) {
+        sender.send('runs:output', runId, 'stdout', pendingStdout);
+        pendingStdout = '';
+      }
+      if (pendingStderr) {
+        sender.send('runs:output', runId, 'stderr', pendingStderr);
+        pendingStderr = '';
+      }
+    };
+    const schedule = () => { if (!flushTimer) flushTimer = setTimeout(flush, FLUSH_MS); };
+
     const proc = spawn(command, { cwd: worktreePath, shell: true });
     this.runs.set(runId, { proc, worktreePath, commandName });
+    if (this.statsPoller && proc.pid) this.statsPoller.start(runId, proc.pid, sender);
     sender.send('runs:output', runId, 'meta', `$ ${command}\n`);
     proc.stdout.on('data', d => {
       const t = d.toString();
       append('stdout', t);
-      sender.send('runs:output', runId, 'stdout', t);
+      pendingStdout += t;
+      schedule();
     });
     proc.stderr.on('data', d => {
       const t = d.toString();
       append('stderr', t);
-      sender.send('runs:output', runId, 'stderr', t);
+      pendingStderr += t;
+      schedule();
     });
     proc.on('close', code => {
       this.runs.delete(runId);
       buffer.exitCode = code;
       this.runsStore.save(worktreePath, commandName, buffer);
+      if (flushTimer) { clearTimeout(flushTimer); flush(); }
+      else flush();
+      this.statsPoller?.stop(runId);
       sender.send('runs:exit', runId, code);
     });
     return { command };
