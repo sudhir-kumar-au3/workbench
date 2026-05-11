@@ -103,6 +103,40 @@ async function aheadBehindOf(worktreePath) {
   }
 }
 
+// Branch + ahead/behind + dirty/file-count in a SINGLE git invocation.
+// `git status --porcelain=v2 --branch` emits `# branch.*` header lines plus one line
+// per changed/untracked file, so we avoid the previous 3-process fan-out (symbolic-ref +
+// status + rev-list) on every status poll.
+async function statusFull(worktreePath) {
+  try {
+    const out = await gitExec(worktreePath, ['status', '--porcelain=v2', '--branch']);
+    let branch = null;
+    let upstream = null;
+    let hasUpstream = false;
+    let ahead = 0;
+    let behind = 0;
+    let fileCount = 0;
+    for (const line of out.split('\n')) {
+      if (!line) continue;
+      if (line.startsWith('# branch.head ')) {
+        const v = line.slice(14).trim();
+        branch = v === '(detached)' ? null : v;
+      } else if (line.startsWith('# branch.upstream ')) {
+        upstream = line.slice(18).trim() || null;
+        hasUpstream = !!upstream;
+      } else if (line.startsWith('# branch.ab ')) {
+        const m = line.match(/\+(\d+)\s+-(\d+)/);
+        if (m) { ahead = Number.parseInt(m[1], 10) || 0; behind = Number.parseInt(m[2], 10) || 0; }
+      } else if (line[0] === '1' || line[0] === '2' || line[0] === 'u' || line[0] === '?') {
+        fileCount++;
+      }
+    }
+    return { branch, dirty: fileCount > 0, fileCount, hasUpstream, upstream, ahead, behind, error: null };
+  } catch (e) {
+    return { branch: null, dirty: false, fileCount: 0, hasUpstream: false, upstream: null, ahead: 0, behind: 0, error: e.message };
+  }
+}
+
 async function branchResolvable(repoPath, branch) {
   // True if `git worktree add <path> <branch>` would succeed in checking it out.
   try {
@@ -205,6 +239,37 @@ async function commitAll(worktreePath, message) {
   if (!message?.trim()) throw new Error('Commit message is required.');
   await gitExec(worktreePath, ['add', '-A']);
   return gitExec(worktreePath, ['commit', '-m', message]);
+}
+
+// Diff for a single path — all uncommitted changes (staged + unstaged). For an
+// untracked file, returns a synthetic all-additions diff so the UI can still preview it.
+async function diffFile(worktreePath, file) {
+  if (!file) return '';
+  try {
+    const out = await gitExec(worktreePath, ['diff', 'HEAD', '--', file]);
+    if (out.trim()) return out;
+  } catch { /* no HEAD yet, or path errors — fall through to untracked handling */ }
+  let tracked = true;
+  try { await gitExec(worktreePath, ['ls-files', '--error-unmatch', '--', file]); }
+  catch { tracked = false; }
+  if (!tracked) {
+    try {
+      const abs = path.join(worktreePath, file);
+      const content = fs.readFileSync(abs, 'utf8');
+      const lines = content.length ? content.split('\n') : [''];
+      const body = lines.map(l => `+${l}`).join('\n');
+      return `--- /dev/null\n+++ b/${file}\n@@ -0,0 +1,${lines.length} @@\n${body}`;
+    } catch {
+      return `(${file} — binary or unreadable)`;
+    }
+  }
+  // Tracked but `git diff HEAD` was empty: maybe only staged with no HEAD diff, or no changes.
+  try {
+    const cached = await gitExec(worktreePath, ['diff', '--cached', '--', file]);
+    return cached;
+  } catch {
+    return '';
+  }
 }
 
 // Commit only the given file paths (plus any already-staged content).
@@ -406,6 +471,7 @@ module.exports = {
   statusOf,
   statusFiles,
   aheadBehindOf,
+  statusFull,
   isMergedInto,
   branchResolvable,
   scanForWorktrees,
@@ -417,6 +483,7 @@ module.exports = {
   switchBranch,
   rebaseOnUpstream,
   diff,
+  diffFile,
   commitAll,
   commitFiles,
   discardFile,

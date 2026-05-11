@@ -70,7 +70,7 @@ Persistence:
 
 ## Troubleshooting
 
-- **VS Code button does nothing** — uses `open -a "Visual Studio Code"` on macOS, falls back to Cursor, then `code` CLI
+- **Editor button does nothing** — it auto-tries VS Code, Cursor, Windsurf, VSCodium, Zed, Sublime, JetBrains IDEs (and their CLIs). If yours isn't found, set **Settings → Preferred editor** to its app name (macOS) or CLI command.
 - **"fatal: invalid reference" on create** — set Branch handling to **Auto**
 - **Stuck workspace** — Delete offers a force-remove on failure (only the worktrees, never the source repo)
 - **State out of sync after a terminal `git switch`** — click ↻ in the workspace toolbar; app also auto-refreshes on focus

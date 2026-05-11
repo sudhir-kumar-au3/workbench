@@ -22,15 +22,24 @@ function registerHandlers({ settingsStore, runsStore, commandRunner, watcherRegi
       reducedMotion: !!data.reducedMotion,
       showArchived: !!data.showArchived,
       showResourceStats: data.showResourceStats !== false,
+      editorCommand: typeof data.editorCommand === 'string' ? data.editorCommand : '',
+      runConcurrency: typeof data.runConcurrency === 'number' && Number.isFinite(data.runConcurrency) ? data.runConcurrency : 4,
     };
   });
   ipcMain.handle('settings:setPref', (_e, key, value) => {
-    const allowed = ['compactMode', 'sidebarCollapsed', 'accentColor', 'reducedMotion', 'showArchived', 'showResourceStats'];
+    const allowed = ['compactMode', 'sidebarCollapsed', 'accentColor', 'reducedMotion', 'showArchived', 'showResourceStats', 'editorCommand', 'runConcurrency'];
     if (!allowed.includes(key)) throw new TypeError(`Unknown pref: ${key}`);
+    if (key === 'editorCommand' && typeof value !== 'string') throw new TypeError('editorCommand must be a string');
+    let v = value;
+    if (key === 'runConcurrency') {
+      const n = Number(value);
+      if (!Number.isFinite(n)) throw new TypeError('runConcurrency must be a number');
+      v = Math.max(1, Math.min(32, Math.round(n)));
+    }
     const data = settingsStore.read();
-    data[key] = value;
+    data[key] = v;
     settingsStore.write(data);
-    return value;
+    return v;
   });
   ipcMain.handle('settings:setWorkspacesRoot', async () => {
     const result = await dialog.showOpenDialog({ properties: ['openDirectory', 'createDirectory'] });
@@ -160,12 +169,9 @@ function registerHandlers({ settingsStore, runsStore, commandRunner, watcherRegi
   });
 
   // Worktrees
-  ipcMain.handle('worktrees:status', async (_e, worktreePath) => {
-    const [status, ab] = await Promise.all([
-      git.statusOf(worktreePath),
-      git.aheadBehindOf(worktreePath),
-    ]);
-    return { ...status, ...ab };
+  ipcMain.handle('worktrees:status', (_e, worktreePath) => {
+    assertNonEmptyString(worktreePath, 'worktreePath');
+    return git.statusFull(worktreePath);
   });
 
   // Bulk git ops — return per-member result for the caller to render.
@@ -196,6 +202,11 @@ function registerHandlers({ settingsStore, runsStore, commandRunner, watcherRegi
   ipcMain.handle('git:diff', (_e, worktreePath, opts) => {
     assertNonEmptyString(worktreePath, 'worktreePath');
     return git.diff(worktreePath, opts || {});
+  });
+  ipcMain.handle('git:diffFile', (_e, worktreePath, file) => {
+    assertNonEmptyString(worktreePath, 'worktreePath');
+    assertNonEmptyString(file, 'file');
+    return git.diffFile(worktreePath, file);
   });
   ipcMain.handle('git:commitAll', (_e, worktreePath, message) => {
     assertNonEmptyString(worktreePath, 'worktreePath');
@@ -282,7 +293,10 @@ function registerHandlers({ settingsStore, runsStore, commandRunner, watcherRegi
   });
 
   // Editor / Terminal
-  ipcMain.handle('editor:open', (_e, target) => openInEditor(target));
+  ipcMain.handle('editor:open', (_e, target) => {
+    const editorCommand = settingsStore.read().editorCommand || '';
+    return openInEditor(target, editorCommand);
+  });
   ipcMain.handle('terminal:open', (_e, target) => openInTerminal(target));
 
   // Runs

@@ -3,7 +3,9 @@ import { runCommand } from './runs.js';
 import { loadAllStatuses } from './statuses.js';
 
 let lastFocusFetchAt = 0;
+let lastFocusStatusAt = 0;
 const FOCUS_FETCH_COOLDOWN_MS = 60_000;
+const FOCUS_STATUS_COOLDOWN_MS = 5_000; // don't re-poll all worktree statuses on every alt-tab
 
 export function setupAutoActions() {
   // Watch trigger -> re-run the matching command if its card is mounted.
@@ -18,11 +20,17 @@ export function setupAutoActions() {
     }
   });
 
-  // Auto-fetch on app focus (rate-limited).
+  // Auto-fetch on app focus (rate-limited), then refresh statuses (also rate-limited
+  // so rapid window switching doesn't fan out N git processes per focus).
   globalThis.api.onAppFocus(async () => {
     const now = Date.now();
-    if (now - lastFocusFetchAt < FOCUS_FETCH_COOLDOWN_MS) {
+    const doStatus = () => {
+      if (now - lastFocusStatusAt < FOCUS_STATUS_COOLDOWN_MS) return;
+      lastFocusStatusAt = now;
       loadAllStatuses();
+    };
+    if (now - lastFocusFetchAt < FOCUS_FETCH_COOLDOWN_MS) {
+      doStatus();
       return;
     }
     lastFocusFetchAt = now;
@@ -32,6 +40,8 @@ export function setupAutoActions() {
       try { await globalThis.api.git.bulkOp('fetch', paths); }
       catch { /* surface via status */ }
     }
+    // A fetch changes upstream state, so always refresh after one.
+    lastFocusStatusAt = Date.now();
     loadAllStatuses();
   });
 }

@@ -36,6 +36,7 @@ contextBridge.exposeInMainWorld('api', {
     bulkOp: (op, worktreePaths) => ipcRenderer.invoke('git:bulkOp', op, worktreePaths),
     isMerged: (path, target) => ipcRenderer.invoke('git:isMerged', path, target),
     diff: (path, opts) => ipcRenderer.invoke('git:diff', path, opts),
+    diffFile: (path, file) => ipcRenderer.invoke('git:diffFile', path, file),
     commitAll: (path, message) => ipcRenderer.invoke('git:commitAll', path, message),
     commitFiles: (path, message, paths) => ipcRenderer.invoke('git:commitFiles', path, message, paths),
     discardFile: (path, file, isUntracked) => ipcRenderer.invoke('git:discardFile', path, file, isUntracked),

@@ -9,6 +9,8 @@ export const state = {
     reducedMotion: false,
     showArchived: false,
     showResourceStats: true,
+    editorCommand: '',
+    runConcurrency: 4,
   },
   repos: [],
   workspaces: [],
@@ -16,7 +18,7 @@ export const state = {
   runs: new Map(),
   savedRuns: {},
   watching: new Set(),
-  sequentialActive: false,
+  runPoolActive: false,
 };
 
 export function watchKey(worktreePath, commandName) {

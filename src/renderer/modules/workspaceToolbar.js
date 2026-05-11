@@ -24,6 +24,46 @@ function defaultCommand(card) {
   return btn ? { btn, cmdName } : null;
 }
 
+// Run the default command on every mounted card, at most `concurrency` at a time.
+// concurrency = 1 → strictly sequential; concurrency >= card count → all at once.
+async function runPool(concurrency) {
+  if (state.runPoolActive) return;
+  state.runPoolActive = true;
+  const stopBtn = $('#ws-stop-all');
+  stopBtn.classList.remove('hidden');
+  const queue = Array.from(document.querySelectorAll('#member-list .member-card'))
+    .map(card => ({ card, def: defaultCommand(card) }))
+    .filter(x => x.def && !x.def.btn.dataset.runId);
+  const total = queue.length;
+  let started = 0;
+  let finished = 0;
+  const refreshLabel = () => {
+    if (total === 0) { stopBtn.textContent = 'Stop all'; return; }
+    const running = started - finished;
+    const queued = total - started;
+    const bits = [`${finished}/${total}`];
+    if (running) bits.push(`${running} running`);
+    if (queued) bits.push(`${queued} queued`);
+    stopBtn.textContent = `Stop all · ${bits.join(' · ')}`;
+  };
+  refreshLabel();
+  const worker = async () => {
+    while (state.runPoolActive && started < queue.length) {
+      const { card, def } = queue[started++];
+      refreshLabel();
+      if (def.btn.dataset.runId) { finished++; refreshLabel(); continue; } // started elsewhere
+      await runCommand(card, def.cmdName, def.btn);
+      finished++;
+      refreshLabel();
+    }
+  };
+  const n = Math.max(1, Math.min(Math.round(concurrency) || 1, total || 1));
+  await Promise.all(Array.from({ length: n }, () => worker()));
+  state.runPoolActive = false;
+  stopBtn.textContent = 'Stop all';
+  stopBtn.classList.add('hidden');
+}
+
 async function runBulkOp(op, label) {
   const ws = state.activeWorkspace;
   if (!ws) return;
@@ -75,30 +115,21 @@ export function setupWorkspaceToolbar({ openMetadataModal }) {
   });
 
   $('#ws-run-all').addEventListener('click', () => {
-    document.querySelectorAll('#member-list .member-card').forEach(card => {
-      const def = defaultCommand(card);
-      if (def && !def.btn.dataset.runId) runCommand(card, def.cmdName, def.btn);
-    });
+    const n = Number(state.settings?.runConcurrency) || 4;
+    runPool(n);
   });
-
-  $('#ws-run-all-seq').addEventListener('click', async () => {
-    if (state.sequentialActive) return;
-    state.sequentialActive = true;
-    $('#ws-stop-all').classList.remove('hidden');
-    const cards = Array.from(document.querySelectorAll('#member-list .member-card'));
-    for (const card of cards) {
-      if (!state.sequentialActive) break;
-      const def = defaultCommand(card);
-      if (!def || def.btn.dataset.runId) continue;
-      await runCommand(card, def.cmdName, def.btn);
-    }
-    state.sequentialActive = false;
-    $('#ws-stop-all').classList.add('hidden');
-  });
+  $('#ws-run-all-seq').addEventListener('click', () => runPool(1));
 
   $('#ws-stop-all').addEventListener('click', () => {
-    state.sequentialActive = false;
+    state.runPoolActive = false;
     for (const [runId] of state.runs) globalThis.api.runs.stop(runId);
+  });
+
+  $('#ws-open-ide').addEventListener('click', async () => {
+    const ws = state.activeWorkspace;
+    if (!ws) return;
+    try { await globalThis.api.editor.open(`${ws.parentDir}/${ws.name}`); }
+    catch (e) { notify.error(e.message); }
   });
 
   $('#ws-edit-meta').addEventListener('click', () => openMetadataModal());

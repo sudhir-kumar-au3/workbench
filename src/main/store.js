@@ -43,6 +43,14 @@ const MIGRATIONS = [
   function v4(data) {
     if (typeof data.showResourceStats !== 'boolean') data.showResourceStats = true;
   },
+  // v5: editorCommand — preferred editor app name (macOS) or CLI command.
+  function v5(data) {
+    if (typeof data.editorCommand !== 'string') data.editorCommand = '';
+  },
+  // v6: runConcurrency — how many "Run all" commands execute simultaneously.
+  function v6(data) {
+    if (typeof data.runConcurrency !== 'number' || !Number.isFinite(data.runConcurrency)) data.runConcurrency = 4;
+  },
 ];
 
 function applyMigrations(data) {
@@ -98,6 +106,8 @@ function createStores(userDataDir) {
       reducedMotion: false,
       showArchived: false,
       showResourceStats: true,
+      editorCommand: '',
+      runConcurrency: 4,
       workspacesRoot: path.join(os.homedir(), 'worktrees'),
       repos: [],
       workspaces: [],

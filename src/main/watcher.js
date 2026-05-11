@@ -1,13 +1,28 @@
 const chokidar = require('chokidar');
 
+// Directories that are large, machine-generated, or irrelevant to "re-run on change".
+// Ignoring them keeps chokidar from registering tens of thousands of FSEvents/inotify
+// handles per watched worktree (node_modules alone can be 100k+ files).
 const IGNORED = [
   /(^|[/\\])\.git([/\\]|$)/,
   /(^|[/\\])node_modules([/\\]|$)/,
   /(^|[/\\])dist([/\\]|$)/,
   /(^|[/\\])build([/\\]|$)/,
+  /(^|[/\\])out([/\\]|$)/,
   /(^|[/\\])\.next([/\\]|$)/,
+  /(^|[/\\])\.nuxt([/\\]|$)/,
+  /(^|[/\\])\.svelte-kit([/\\]|$)/,
+  /(^|[/\\])\.turbo([/\\]|$)/,
+  /(^|[/\\])\.cache([/\\]|$)/,
+  /(^|[/\\])\.parcel-cache([/\\]|$)/,
+  /(^|[/\\])coverage([/\\]|$)/,
   /(^|[/\\])target([/\\]|$)/,
+  /(^|[/\\])vendor([/\\]|$)/,
   /(^|[/\\])__pycache__([/\\]|$)/,
+  /(^|[/\\])\.venv([/\\]|$)/,
+  /(^|[/\\])\.idea([/\\]|$)/,
+  /(^|[/\\])\.vscode([/\\]|$)/,
+  /(^|[/\\])\.DS_Store$/,
 ];
 
 class WatcherRegistry {

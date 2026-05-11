@@ -2,6 +2,7 @@ import { $, escapeHtml } from './utils.js';
 import { notify } from './notify.js';
 import { loadStatusFor } from './statuses.js';
 import { openGitFailure } from './gitFailureModal.js';
+import { colorizeDiff } from './diffModal.js';
 
 const KIND_CLASS = {
   M: 'kind-M',
@@ -15,6 +16,35 @@ const KIND_CLASS = {
 
 let currentTarget = null;
 let currentFiles = [];
+let previewedPath = null;
+
+function hidePreview() {
+  previewedPath = null;
+  $('#commit-diff-preview').classList.add('hidden');
+  $('#commit-diff-preview-body').innerHTML = '';
+  $('#commit-files-list').querySelectorAll('.commit-file-row.previewing')
+    .forEach(el => el.classList.remove('previewing'));
+}
+
+async function previewFile(path, rowEl) {
+  if (previewedPath === path) { hidePreview(); return; }
+  previewedPath = path;
+  $('#commit-files-list').querySelectorAll('.commit-file-row.previewing')
+    .forEach(el => el.classList.remove('previewing'));
+  rowEl?.classList.add('previewing');
+  const preview = $('#commit-diff-preview');
+  const body = $('#commit-diff-preview-body');
+  $('#commit-diff-preview-path').textContent = path;
+  body.innerHTML = '<span class="muted">Loading…</span>';
+  preview.classList.remove('hidden');
+  try {
+    const diff = await globalThis.api.git.diffFile(currentTarget, path);
+    if (previewedPath !== path) return; // user clicked another file meanwhile
+    body.innerHTML = diff?.trim() ? colorizeDiff(diff) : '<span class="muted">No textual changes.</span>';
+  } catch (e) {
+    body.innerHTML = `<span class="muted">${escapeHtml(e.message)}</span>`;
+  }
+}
 
 function setProgress(text, kind = 'busy') {
   const el = $('#commit-progress');
@@ -69,9 +99,15 @@ function renderFiles() {
     row.innerHTML = `
       <input type="checkbox" data-path="${escapeHtml(f.path)}" checked />
       <span class="modified-file-status ${kindClass}" title="${escapeHtml(f.code)}">${escapeHtml(f.code.replace(/ /g, '·'))}</span>
-      <span class="commit-file-path" title="${escapeHtml(f.path)}">${escapeHtml(f.path)}</span>
+      <span class="commit-file-path" title="Click to preview diff — ${escapeHtml(f.path)}">${escapeHtml(f.path)}</span>
     `;
     row.querySelector('input').addEventListener('change', updateSummary);
+    row.querySelector('.commit-file-path').addEventListener('click', (e) => {
+      // Don't toggle the row's checkbox when the user clicks the filename to preview.
+      e.preventDefault();
+      e.stopPropagation();
+      previewFile(f.path, row);
+    });
     list.appendChild(row);
   }
   updateSummary();
@@ -99,6 +135,7 @@ export async function openCommitModal(label, worktreePath) {
   currentFiles = [];
   $('#commit-files-list').innerHTML = '<div class="empty-row">Loading…</div>';
   $('#commit-files-summary').textContent = 'Files';
+  hidePreview();
   $('#commit-modal').classList.remove('hidden');
   setTimeout(() => $('#commit-message').focus(), 50);
   await loadFiles(worktreePath);
@@ -183,4 +220,5 @@ export function setupCommitModal() {
     $('#commit-files-list').querySelectorAll('input[type="checkbox"]').forEach(cb => { cb.checked = false; });
     updateSummary();
   });
+  $('#commit-diff-preview-close').addEventListener('click', hidePreview);
 }

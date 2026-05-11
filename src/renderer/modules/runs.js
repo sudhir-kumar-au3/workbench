@@ -2,15 +2,31 @@ import { state } from './state.js';
 import { loadAllStatuses } from './statuses.js';
 import { renderAnsiInto } from './ansi.js';
 
+const NEAR_BOTTOM_PX = 32; // tolerance for "is the user scrolled to the bottom?"
+
+function isNearBottom(el) {
+  return el.scrollHeight - el.scrollTop - el.clientHeight <= NEAR_BOTTOM_PX;
+}
+
+function setFollowTail(panel, follow) {
+  panel.classList.toggle('detached', !follow);
+}
+
 export function appendOutput(bodyEl, stream, text) {
+  const wasAtBottom = isNearBottom(bodyEl);
   const span = document.createElement('span');
   span.className = `chunk ${stream}`;
   if (stream === 'meta') span.textContent = text;
   else renderAnsiInto(span, text);
   bodyEl.appendChild(span);
-  bodyEl.scrollTop = bodyEl.scrollHeight;
-  // If a search filter is active on the parent panel, re-apply it to highlight new content.
+  // Only stick to the tail if the user was already there — don't yank them down
+  // mid-read. The "detached" class drives the jump-to-bottom pill.
+  if (wasAtBottom) {
+    bodyEl.scrollTop = bodyEl.scrollHeight;
+  }
   const panel = bodyEl.closest('.test-output');
+  if (panel) setFollowTail(panel, wasAtBottom || isNearBottom(bodyEl));
+  // If a search filter is active on the parent panel, re-apply it to highlight new content.
   const searchInput = panel?.querySelector('[data-search]');
   if (searchInput?.value) applyHighlight(bodyEl, searchInput.value);
 }
@@ -83,8 +99,18 @@ export function ensureOutputPanel(card) {
         <button class="btn btn-ghost" data-close title="Close output panel" aria-label="Close output panel">${CLOSE_ICON_HTML}</button>
       </div>
       <div class="test-output-body" data-output-body></div>
+      <button class="test-output-jump" data-jump-bottom title="Jump to latest output">↓ latest</button>
     `;
     card.appendChild(panel);
+    const body = panel.querySelector('[data-output-body]');
+    // Track follow-tail state from the user's own scrolling.
+    body.addEventListener('scroll', () => {
+      setFollowTail(panel, isNearBottom(body));
+    });
+    panel.querySelector('[data-jump-bottom]').addEventListener('click', () => {
+      body.scrollTop = body.scrollHeight;
+      setFollowTail(panel, true);
+    });
     panel.querySelector('[data-search]').addEventListener('input', e => {
       applyHighlight(panel.querySelector('[data-output-body]'), e.target.value);
     });
@@ -216,6 +242,7 @@ export function runCommand(card, commandName, cmdBtn) {
     const panel = ensureOutputPanel(card);
     panel.classList.remove('hidden');
     panel.classList.remove('collapsed');
+    panel.classList.remove('detached');
     panel.dataset.lastCommand = commandName;
     panel.querySelector('[data-cmd-label]').textContent = `${commandName} • running`;
     setCloseButtonRunning(panel, true);

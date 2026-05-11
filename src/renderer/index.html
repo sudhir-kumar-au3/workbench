@@ -48,6 +48,12 @@
           <div>
             <div class="ws-title-row">
               <h1 id="ws-name" aria-live="polite">Workspace</h1>
+              <button id="ws-open-ide" class="btn btn-icon" title="Open whole workspace in editor (VS Code/Cursor)" aria-label="Open workspace in editor">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polyline points="16 18 22 12 16 6"/>
+                  <polyline points="8 6 2 12 8 18"/>
+                </svg>
+              </button>
               <button id="ws-edit-meta" class="btn btn-ghost" title="Edit metadata">✎</button>
             </div>
             <p id="ws-meta" class="workspace-meta"></p>
@@ -193,6 +199,14 @@
         </div>
       </label>
       <p class="hint">New workspaces are created under this directory by default.</p>
+      <label>Preferred editor
+        <input id="settings-editor" type="text" placeholder="e.g. Cursor, Windsurf, Zed, or a CLI like 'code'" />
+      </label>
+      <p class="hint">macOS: an app name (used with <code>open -a</code>). Other platforms: a CLI command. Leave blank to auto-detect.</p>
+      <label>Run all — max concurrent commands
+        <input id="settings-run-concurrency" type="number" min="1" max="32" step="1" />
+      </label>
+      <p class="hint">How many "Run all" commands execute at once. Lower = gentler on CPU; <code>1</code> = strictly sequential.</p>
       <div class="field-label">Accent color</div>
       <div id="accent-swatches" class="accent-swatches">
         <button class="accent-swatch" data-accent="indigo" title="Indigo (default)" aria-label="Indigo accent"></button>
@@ -316,12 +330,15 @@
 
   <!-- Diff viewer -->
   <div id="diff-modal" class="modal hidden">
-    <div class="modal-content modal-wide">
+    <div class="modal-content modal-xwide">
       <div class="modal-header-row">
         <h2 id="diff-title">Diff</h2>
         <span class="muted" id="diff-meta"></span>
       </div>
-      <pre id="diff-body" class="diff-body"></pre>
+      <div class="diff-layout">
+        <div id="diff-filelist" class="diff-filelist"></div>
+        <pre id="diff-body" class="diff-body"></pre>
+      </div>
       <div class="modal-actions">
         <button id="diff-close" class="btn">Close</button>
       </div>
@@ -342,6 +359,13 @@
         </div>
       </div>
       <div id="commit-files-list" class="commit-files-list"></div>
+      <div id="commit-diff-preview" class="commit-diff-preview hidden">
+        <div class="commit-diff-preview-header">
+          <span id="commit-diff-preview-path" class="muted"></span>
+          <button type="button" class="btn btn-ghost" id="commit-diff-preview-close" title="Hide preview">×</button>
+        </div>
+        <pre id="commit-diff-preview-body" class="diff-body"></pre>
+      </div>
 
       <label>Message
         <textarea id="commit-message" rows="3" placeholder="Brief description of the change"></textarea>

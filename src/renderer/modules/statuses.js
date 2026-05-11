@@ -23,30 +23,45 @@ function fetchStatusOnce(worktreePath) {
   return p;
 }
 
+// Only show the "…" loading state on a badge that has nothing in it yet (a brand-new
+// card). On re-polls, leave the previous value visible so it doesn't flicker on every
+// window-focus refresh — we'll swap it only if the new value actually differs.
+function markLoadingIfEmpty(badge) {
+  if (badge && !badge.textContent.trim()) {
+    badge.textContent = '…';
+    badge.className = 'status-badge loading';
+  }
+}
+
+// Set element text/class/title only when they differ — avoids needless DOM writes
+// (and the visible flash they cause).
+function setIfChanged(el, { text, className, title }) {
+  if (!el) return;
+  if (text !== undefined && el.textContent !== text) el.textContent = text;
+  if (className !== undefined && el.className !== className) el.className = className;
+  if (title !== undefined && (el.title || '') !== (title || '')) el.title = title || '';
+}
+
 function applyStatusToCard(card, r) {
   const badge = card.querySelector('[data-status]');
   const ab = card.querySelector('[data-ahead-behind]');
-  if (!badge) return;
-  if (r.error) {
-    badge.textContent = 'error';
-    badge.className = 'status-badge error';
-    badge.title = r.error;
-  } else if (r.dirty) {
-    badge.textContent = `● ${r.fileCount} modified`;
-    badge.className = 'status-badge dirty';
-    badge.title = '';
-  } else {
-    badge.textContent = '✓ clean';
-    badge.className = 'status-badge clean';
-    badge.title = '';
+  if (badge) {
+    if (r.error) {
+      setIfChanged(badge, { text: 'error', className: 'status-badge error', title: r.error });
+    } else if (r.dirty) {
+      setIfChanged(badge, { text: `● ${r.fileCount} modified`, className: 'status-badge dirty', title: '' });
+    } else {
+      setIfChanged(badge, { text: '✓ clean', className: 'status-badge clean', title: '' });
+    }
   }
   if (ab) {
-    ab.textContent = formatAheadBehind(r);
-    ab.title = r.upstream ? `vs ${r.upstream}` : '';
+    setIfChanged(ab, { text: formatAheadBehind(r), title: r.upstream ? `vs ${r.upstream}` : '' });
   }
   if (r.branch) {
     const branchEl = card.querySelector('[data-branch]');
-    if (branchEl?.firstChild) branchEl.firstChild.nodeValue = r.branch + ' ';
+    if (branchEl?.firstChild && branchEl.firstChild.nodeValue !== r.branch + ' ') {
+      branchEl.firstChild.nodeValue = r.branch + ' ';
+    }
     const ws = state.activeWorkspace;
     if (ws) {
       const member = ws.members.find(m => m.worktreePath === card.dataset.worktreePath);
@@ -55,25 +70,22 @@ function applyStatusToCard(card, r) {
   }
 }
 
+function applyErrorToCard(card, message) {
+  const badge = card.querySelector('[data-status]');
+  setIfChanged(badge, { text: 'error', className: 'status-badge error', title: message });
+}
+
 export async function loadStatusFor(worktreePath) {
   const card = document.querySelector(`#member-list .member-card[data-worktree-path="${CSS.escape(worktreePath)}"]`);
   if (!card) return;
-  const badge = card.querySelector('[data-status]');
-  if (badge && !badge.classList.contains('loading')) {
-    badge.textContent = '…';
-    badge.className = 'status-badge loading';
-  }
+  markLoadingIfEmpty(card.querySelector('[data-status]'));
   try {
     const r = await fetchStatusOnce(worktreePath);
     if (!card.isConnected) return;
     applyStatusToCard(card, r);
   } catch (e) {
     if (!card.isConnected) return;
-    if (badge) {
-      badge.textContent = 'error';
-      badge.className = 'status-badge error';
-      badge.title = e.message;
-    }
+    applyErrorToCard(card, e.message);
   }
 }
 
@@ -81,13 +93,7 @@ export async function loadAllStatuses() {
   if (!state.activeWorkspace) return;
   const cards = document.querySelectorAll('#member-list .member-card');
   await Promise.all(Array.from(cards).map(async (card) => {
-    const badge = card.querySelector('[data-status]');
-    const ab = card.querySelector('[data-ahead-behind]');
-    if (badge && !badge.classList.contains('loading')) {
-      badge.textContent = '…';
-      badge.className = 'status-badge loading';
-    }
-    if (ab && !ab.textContent) ab.textContent = '';
+    markLoadingIfEmpty(card.querySelector('[data-status]'));
     try {
       const r = await fetchStatusOnce(card.dataset.worktreePath);
       // Card might have been removed during the fetch (workspace switch / member removed).
@@ -95,11 +101,7 @@ export async function loadAllStatuses() {
       applyStatusToCard(card, r);
     } catch (e) {
       if (!card.isConnected) return;
-      if (badge) {
-        badge.textContent = 'error';
-        badge.className = 'status-badge error';
-        badge.title = e.message;
-      }
+      applyErrorToCard(card, e.message);
     }
   }));
 }

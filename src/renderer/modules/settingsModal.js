@@ -11,6 +11,8 @@ function paintSwatches() {
 export function setupSettingsModal() {
   $('#settings-btn').addEventListener('click', () => {
     $('#settings-root').value = state.settings.workspacesRoot;
+    $('#settings-editor').value = state.settings.editorCommand || '';
+    $('#settings-run-concurrency').value = Number(state.settings.runConcurrency) || 4;
     $('#settings-reduced-motion').checked = !!state.settings.reducedMotion;
     $('#settings-resource-stats').checked = state.settings.showResourceStats !== false;
     paintSwatches();
@@ -29,6 +31,23 @@ export function setupSettingsModal() {
     applyDisplayPrefs();
     await globalThis.api.settings.setPref('reducedMotion', e.target.checked);
   });
+  const saveEditor = async () => {
+    const value = $('#settings-editor').value.trim();
+    state.settings.editorCommand = value;
+    await globalThis.api.settings.setPref('editorCommand', value);
+  };
+  $('#settings-editor').addEventListener('change', saveEditor);
+  $('#settings-editor').addEventListener('blur', saveEditor);
+
+  const saveConcurrency = async () => {
+    const raw = Number($('#settings-run-concurrency').value);
+    const clamped = Math.max(1, Math.min(32, Number.isFinite(raw) ? Math.round(raw) : 4));
+    $('#settings-run-concurrency').value = clamped;
+    state.settings.runConcurrency = clamped;
+    await globalThis.api.settings.setPref('runConcurrency', clamped);
+  };
+  $('#settings-run-concurrency').addEventListener('change', saveConcurrency);
+  $('#settings-run-concurrency').addEventListener('blur', saveConcurrency);
   $('#settings-resource-stats').addEventListener('change', async (e) => {
     state.settings.showResourceStats = e.target.checked;
     document.body.classList.toggle('hide-resource-stats', !e.target.checked);
