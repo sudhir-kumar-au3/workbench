@@ -7,6 +7,7 @@ import { restoreOutput } from './runs.js';
 import { openGitFailure } from './gitFailureModal.js';
 import { openHistoryModal } from './historyModal.js';
 import { openConflictsModal } from './conflictsModal.js';
+import { openCreatePr } from './createPrModal.js';
 
 let openMenu = null;
 
@@ -36,7 +37,7 @@ function buildItems(card) {
   const worktreePath = card.dataset.worktreePath;
   const branchEl = card.querySelector('[data-branch]');
   const branch = branchEl ? branchEl.firstChild.nodeValue.trim() : '';
-  const repoLabel = card.querySelector('.member-name')?.firstChild?.textContent?.trim() || 'repo';
+  const repoLabel = card.dataset.repoLabel || worktreePath.split('/').pop();
 
   const savedForWorktree = state.savedRuns[worktreePath];
   const lastRun = savedForWorktree
@@ -45,32 +46,31 @@ function buildItems(card) {
         .sort(([, a], [, b]) => (b.ranAt || '').localeCompare(a.ranAt || ''))[0]
     : null;
 
-  const items = [
+  const lastRunItem = lastRun
+    ? (() => {
+        const [lastCmd, lastEntry] = lastRun;
+        return [{
+          label: `Show last output (${lastCmd})`,
+          run: async () => {
+            if (lastEntry.dismissed) {
+              await globalThis.api.runs.setDismissed(worktreePath, lastCmd, false);
+              lastEntry.dismissed = false;
+            }
+            restoreOutput(card, lastCmd, lastEntry);
+            card.querySelector('.test-output')?.classList.remove('collapsed');
+          },
+        }, { sep: true }];
+      })()
+    : [];
+
+  return [
     { label: 'Open diff', run: () => openDiff(`${repoLabel} — diff`, worktreePath) },
     { label: 'Show history…', run: () => openHistoryModal(repoLabel, worktreePath) },
     { label: 'Commit + push…', run: () => openCommitModal(repoLabel, worktreePath) },
+    { label: 'Create pull request…', run: () => openCreatePr(card) },
     { label: 'Resolve conflicts…', run: () => openConflictsModal(repoLabel, worktreePath) },
     { sep: true },
-  ];
-
-  if (lastRun) {
-    const [lastCmd, lastEntry] = lastRun;
-    items.push({
-      label: `Show last output (${lastCmd})`,
-      run: async () => {
-        if (lastEntry.dismissed) {
-          await globalThis.api.runs.setDismissed(worktreePath, lastCmd, false);
-          lastEntry.dismissed = false;
-        }
-        restoreOutput(card, lastCmd, lastEntry);
-        const panel = card.querySelector('.test-output');
-        panel?.classList.remove('collapsed');
-      },
-    });
-    items.push({ sep: true });
-  }
-
-  items.push(
+    ...lastRunItem,
     {
       label: 'Fast-forward (pull --ff-only)',
       run: async () => {
@@ -80,13 +80,7 @@ function buildItems(card) {
           notify.success('Fast-forwarded.');
           loadStatusFor(worktreePath);
         } catch (e) {
-          openGitFailure({
-            op: 'fast-forward',
-            worktreePath,
-            label: repoLabel,
-            error: e.message,
-            retry: doFf,
-          });
+          openGitFailure({ op: 'fast-forward', worktreePath, label: repoLabel, error: e.message, retry: doFf });
         }
       },
     },
@@ -107,8 +101,7 @@ function buildItems(card) {
     { sep: true },
     { label: 'Copy worktree path', run: () => copy(worktreePath, 'path') },
     { label: 'Copy branch name', run: () => copy(branch, 'branch') },
-  );
-  return items;
+  ];
 }
 
 export function showActionMenu(triggerBtn, card) {

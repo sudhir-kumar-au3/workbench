@@ -56,6 +56,40 @@ async function createWorkspace(spec, settingsStore) {
   return data.workspaces;
 }
 
+// Spin up a single-member workspace for reviewing a PR: fetch the PR's head into a
+// local branch, add a worktree on it, register a workspace named after the PR.
+async function createWorkspaceFromPr(spec, settingsStore) {
+  // spec: { repoPath, prNumber, name?, parentDir? }
+  const data = settingsStore.read();
+  const repo = data.repos.find(r => r.path === spec.repoPath);
+  if (!repo) throw new Error(`Repo not registered: ${spec.repoPath}`);
+  const { branch, title, number } = await git.fetchPrBranch(spec.repoPath, spec.prNumber);
+  const name = (spec.name || '').trim() || `pr-${number}`;
+  if (data.workspaces.some(w => w.name === name)) {
+    throw new Error(`A workspace named "${name}" already exists.`);
+  }
+  const parentDir = spec.parentDir || data.workspacesRoot;
+  const workspaceDir = path.join(parentDir, name);
+  fs.mkdirSync(workspaceDir, { recursive: true });
+  const wtPath = path.join(workspaceDir, repo.name);
+  try {
+    // Branch already exists locally (created by fetchPrBranch) → not a new branch.
+    await git.worktreeAdd(spec.repoPath, wtPath, branch, false);
+  } catch (e) {
+    try { fs.rmdirSync(workspaceDir); } catch { /* may not be empty */ }
+    throw e;
+  }
+  data.workspaces.push({
+    name,
+    parentDir,
+    members: [{ repoPath: spec.repoPath, worktreePath: wtPath, branch }],
+    description: title ? `Reviewing PR #${number}: ${title}` : `Reviewing PR #${number}`,
+    links: [],
+  });
+  settingsStore.write(data);
+  return { workspaces: data.workspaces, name };
+}
+
 async function importWorkspace(spec, settingsStore) {
   // spec: { name, parentDir, members: [{ repoPath, worktreePath, branch }] }
   const data = settingsStore.read();
@@ -160,6 +194,7 @@ function reorder(orderedNames, settingsStore) {
 
 module.exports = {
   createWorkspace,
+  createWorkspaceFromPr,
   importWorkspace,
   deleteWorkspace,
   updateMetadata,

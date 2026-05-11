@@ -107,6 +107,17 @@ function registerHandlers({ settingsStore, runsStore, commandRunner, watcherRegi
     }
     return data.repos;
   });
+  ipcMain.handle('repos:setSetupCommand', (_e, repoPath, command) => {
+    assertNonEmptyString(repoPath, 'repoPath');
+    if (typeof command !== 'string') throw new TypeError('command must be a string');
+    const data = settingsStore.read();
+    const repo = data.repos.find(r => r.path === repoPath);
+    if (repo) {
+      repo.setupCommand = command.trim();
+      settingsStore.write(data);
+    }
+    return data.repos;
+  });
   ipcMain.handle('repos:branches', (_e, repoPath) => {
     assertNonEmptyString(repoPath, 'repoPath');
     return git.listBranches(repoPath);
@@ -121,6 +132,10 @@ function registerHandlers({ settingsStore, runsStore, commandRunner, watcherRegi
   ipcMain.handle('workspaces:import', (_e, spec) => {
     Schemas.workspaceImport(spec);
     return workspaces.importWorkspace(spec, settingsStore);
+  });
+  ipcMain.handle('workspaces:createFromPr', (_e, spec) => {
+    assertNonEmptyString(spec?.repoPath, 'repoPath');
+    return workspaces.createWorkspaceFromPr(spec, settingsStore);
   });
   ipcMain.handle('workspaces:scanForWorktrees', (_e, dir) => {
     assertNonEmptyString(dir, 'dir');
@@ -266,6 +281,14 @@ function registerHandlers({ settingsStore, runsStore, commandRunner, watcherRegi
   ipcMain.handle('git:clearPrCache', (_e, worktreePath) => {
     git.clearPrCache(worktreePath || null);
     return true;
+  });
+  ipcMain.handle('git:lastCommitMessage', (_e, worktreePath) => {
+    assertNonEmptyString(worktreePath, 'worktreePath');
+    return git.lastCommitMessage(worktreePath);
+  });
+  ipcMain.handle('git:createPr', (_e, worktreePath, opts) => {
+    assertNonEmptyString(worktreePath, 'worktreePath');
+    return git.createPr(worktreePath, opts || {});
   });
   ipcMain.handle('git:stash', (_e, worktreePath, message) => {
     assertNonEmptyString(worktreePath, 'worktreePath');

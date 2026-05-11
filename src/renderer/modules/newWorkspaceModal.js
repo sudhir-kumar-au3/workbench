@@ -3,6 +3,8 @@ import { $, escapeHtml } from './utils.js';
 import { refresh } from './refresh.js';
 import { renderSidebar } from './sidebar.js';
 import { renderMain } from './workspaceView.js';
+import { startRun } from './runs.js';
+import { notify } from './notify.js';
 
 function syncBranchPlaceholders() {
   const fallback = $('#ws-input-branch').value.trim() || $('#ws-input-name').value.trim() || 'branch';
@@ -66,9 +68,26 @@ async function confirm() {
     state.activeWorkspace = state.workspaces.find(w => w.name === name) || null;
     renderSidebar();
     renderMain();
+    runSetupCommands();
   } catch (e) {
     errEl.textContent = e.message;
   }
+}
+
+// After the workspace's cards are in the DOM, kick off each repo's configured setup
+// command (e.g. `npm install`) as a button-less run so it shows up in the card's output
+// panel with live progress. Fire-and-forget — the panels are the feedback.
+function runSetupCommands() {
+  const cards = document.querySelectorAll('#member-list .member-card');
+  let launched = 0;
+  for (const card of cards) {
+    const repo = state.repos.find(r => r.path === card.dataset.repoPath);
+    const cmd = (repo?.setupCommand || '').trim();
+    if (!cmd) continue;
+    launched++;
+    startRun(card, { commandName: 'setup', command: cmd, cmdBtn: null });
+  }
+  if (launched > 0) notify.success(`Running setup in ${launched} repo${launched === 1 ? '' : 's'}…`);
 }
 
 export function setupNewWorkspaceModal() {

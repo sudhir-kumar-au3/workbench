@@ -44,6 +44,9 @@ function renderRepoRows() {
         <button class="btn" data-action="save">Save</button>
         <button class="btn btn-danger" data-action="remove">Remove</button>
       </div>
+      <label class="repo-setup-label">Setup command (runs in each new worktree after creation)
+        <input type="text" class="repo-setup-cmd" placeholder="e.g. npm install" value="${escapeHtml(repo.setupCommand || '')}" />
+      </label>
       <div class="repo-commands"></div>
     `;
     const cmdsContainer = row.querySelector('.repo-commands');
@@ -62,6 +65,8 @@ function renderRepoRows() {
         }))
         .filter(c => c.name);
       state.repos = await globalThis.api.repos.setCommands(repo.path, commands);
+      state.repos = await globalThis.api.repos.setSetupCommand(repo.path, row.querySelector('.repo-setup-cmd').value);
+      notify.success(`Saved ${repo.name}`);
     });
     row.querySelector('[data-action="remove"]').addEventListener('click', async () => {
       try {

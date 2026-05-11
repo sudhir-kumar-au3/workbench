@@ -20,6 +20,8 @@ import { setupCommitModal } from './modules/commitModal.js';
 import { setupGitFailureModal } from './modules/gitFailureModal.js';
 import { setupHistoryModal } from './modules/historyModal.js';
 import { setupConflictsModal } from './modules/conflictsModal.js';
+import { setupCreatePrModal } from './modules/createPrModal.js';
+import { setupReviewPrModal } from './modules/reviewPrModal.js';
 import { setupShowArchivedToggle } from './modules/archivedToggle.js';
 
 attachRunListeners();
@@ -43,5 +45,7 @@ setupCommitModal();
 setupGitFailureModal();
 setupHistoryModal();
 setupConflictsModal();
+setupCreatePrModal();
+setupReviewPrModal();
 setupShowArchivedToggle();
 refresh();

@@ -8,6 +8,7 @@ import { notify } from './notify.js';
 import { openGitFailure } from './gitFailureModal.js';
 import { refreshPrChips } from './memberCard.js';
 import { icons } from './icons.js';
+import { openCreatePrBulk } from './createPrModal.js';
 
 const OP_DISPLAY_TO_KIND = {
   fetch: 'pull',  // fetch failures are basically network/auth — group with pull
@@ -118,6 +119,10 @@ export function setupWorkspaceToolbar({ openMetadataModal }) {
   $('#ws-push').addEventListener('click', () => {
     if (!confirm('Push all members of this workspace?')) return;
     runBulkOp('push', 'Push');
+  });
+  $('#ws-create-prs').addEventListener('click', () => {
+    if (!state.activeWorkspace) return;
+    openCreatePrBulk();
   });
 
   $('#ws-run-all').addEventListener('click', () => {

@@ -1036,7 +1036,7 @@ body.reduced-motion .test-output-toolbar [data-close].is-stop { animation: none;
   color: var(--text);
   font-weight: 400;
 }
-.modal-content input[type="text"], .modal-content input[type="url"], .modal-content textarea, .modal-content select {
+.modal-content input[type="text"], .modal-content input[type="url"], .modal-content input[type="number"], .modal-content textarea, .modal-content select {
   width: 100%;
   padding: 8px 12px;
   border: 1px solid var(--border-strong);
@@ -1049,7 +1049,7 @@ body.reduced-motion .test-output-toolbar [data-close].is-stop { animation: none;
   outline: none;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
-.modal-content input[type="text"]:focus, .modal-content input[type="url"]:focus, .modal-content textarea:focus, .modal-content select:focus {
+.modal-content input[type="text"]:focus, .modal-content input[type="url"]:focus, .modal-content input[type="number"]:focus, .modal-content textarea:focus, .modal-content select:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
@@ -1116,6 +1116,9 @@ textarea { resize: vertical; min-height: 60px; }
   transition: background 0.15s ease, color 0.15s ease;
 }
 .pr-chip.hidden { display: none; }
+.checks-chip { cursor: pointer; }
+.checks-chip.hidden { display: none; }
+.checks-chip.chip-warn { animation: dirty-pulse 2s ease-in-out infinite; }
 .pr-chip:hover { background: rgba(34, 211, 238, 0.2); color: #ffffff; }
 .pr-chip[data-state="merged"] {
   background: rgba(168, 85, 247, 0.12);
@@ -1312,10 +1315,22 @@ body.reduced-motion .commit-progress .spinner { animation: none; }
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.repo-setup-label {
+  display: block;
+  margin: 8px 0 4px 0;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.repo-setup-cmd {
+  margin: 4px 0 0 0 !important;
+  font-size: 11px;
+  font-family: 'SF Mono', Menlo, monospace;
+}
 .repo-commands {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  margin-top: 8px;
 }
 .repo-command-row {
   display: flex;

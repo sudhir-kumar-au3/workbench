@@ -33,15 +33,29 @@ function commandsSignature(commands) {
   return commands.map(c => `${c.name}|${c.command || ''}`).join(';');
 }
 
+const CHECKS_CHIP = {
+  passing: { cls: 'chip-success', text: '✓ checks', title: 'All checks passing' },
+  failing: { cls: 'chip-danger', text: '✗ checks', title: 'One or more checks failing' },
+  pending: { cls: 'chip-warn', text: '● checks', title: 'Checks running' },
+};
+
 async function loadPrChip(card, worktreePath) {
   const chip = card.querySelector('[data-pr]');
+  const checksChip = card.querySelector('[data-checks]');
   if (!chip) return;
+  const hideChecks = () => {
+    if (checksChip) {
+      checksChip.className = 'checks-chip chip hidden';
+      checksChip.textContent = '';
+    }
+  };
   try {
     const pr = await globalThis.api.git.prForBranch(worktreePath);
     if (!card.isConnected) return;
     if (!pr?.number) {
       chip.classList.add('hidden');
       chip.textContent = '';
+      hideChecks();
       return;
     }
     const stateClass = (pr.state || '').toLowerCase();
@@ -50,6 +64,18 @@ async function loadPrChip(card, worktreePath) {
     chip.dataset.state = stateClass;
     chip.title = pr.title ? `${pr.title} — ${pr.url}` : pr.url || '';
     chip.textContent = `PR #${pr.number}`;
+    // Checks chip — only when the PR has any CI checks.
+    if (checksChip) {
+      const spec = pr.checks ? CHECKS_CHIP[pr.checks] : null;
+      if (spec) {
+        checksChip.className = `checks-chip chip ${spec.cls}`;
+        checksChip.textContent = spec.text;
+        checksChip.title = `${spec.title} — ${pr.url}`;
+        checksChip.dataset.url = pr.url || '';
+      } else {
+        hideChecks();
+      }
+    }
   } catch {
     // gh not installed or non-GitHub remote — silently ignore.
   }
@@ -112,6 +138,7 @@ function buildCard(m) {
           <span class="status-badge" data-status></span>
           <span class="ahead-behind" data-ahead-behind></span>
           <span class="pr-chip hidden" data-pr></span>
+          <span class="checks-chip chip hidden" data-checks></span>
         </div>
         <div class="member-path" data-path-display title="${escapeHtml(m.worktreePath)}">${escapeHtml(m.worktreePath)}</div>
       </div>
@@ -166,11 +193,10 @@ function buildCard(m) {
   }
   attachBranchEditor(card, card.querySelector('[data-branch]'), m.branch);
 
-  const prChip = card.querySelector('[data-pr]');
-  if (prChip) {
-    prChip.addEventListener('click', () => {
-      const url = prChip.dataset.url;
-      if (url) globalThis.api.fs.openPath(url);
+  for (const sel of ['[data-pr]', '[data-checks]']) {
+    const el = card.querySelector(sel);
+    if (el) el.addEventListener('click', () => {
+      if (el.dataset.url) globalThis.api.fs.openPath(el.dataset.url);
     });
   }
 

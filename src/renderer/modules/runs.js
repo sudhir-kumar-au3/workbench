@@ -226,18 +226,20 @@ function findRepoCommand(repoPath, commandName) {
   return repo?.commands?.find(c => c.name === commandName) || null;
 }
 
-export function runCommand(card, commandName, cmdBtn) {
+// Core run launcher. `cmdBtn` is optional — pass it for command-button runs (so the
+// button toggles run/stop and flashes pass/fail); omit it for button-less runs such as
+// the post-create setup command, which still get a full output panel.
+export function startRun(card, { commandName, command, cmdBtn = null }) {
   return new Promise(resolve => {
     const worktreePath = card.dataset.worktreePath;
-    const repoPath = card.dataset.repoPath;
-    const repoCmd = findRepoCommand(repoPath, commandName);
-    const command = repoCmd?.command || '';
 
-    const existingRunId = cmdBtn.dataset.runId;
-    if (existingRunId && state.runs.has(existingRunId)) {
-      globalThis.api.runs.stop(existingRunId);
-      state.runs.get(existingRunId).onComplete = resolve;
-      return;
+    if (cmdBtn) {
+      const existingRunId = cmdBtn.dataset.runId;
+      if (existingRunId && state.runs.has(existingRunId)) {
+        globalThis.api.runs.stop(existingRunId);
+        state.runs.get(existingRunId).onComplete = resolve;
+        return;
+      }
     }
 
     const panel = ensureOutputPanel(card);
@@ -250,9 +252,11 @@ export function runCommand(card, commandName, cmdBtn) {
     body.innerHTML = '';
 
     const runId = `run-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    cmdBtn.dataset.runId = runId;
-    cmdBtn.classList.add('running');
-    cmdBtn.textContent = `Stop ${commandName}`;
+    if (cmdBtn) {
+      cmdBtn.dataset.runId = runId;
+      cmdBtn.classList.add('running');
+      cmdBtn.textContent = `Stop ${commandName}`;
+    }
 
     // Live timer.
     const startedAt = Date.now();
@@ -271,6 +275,11 @@ export function runCommand(card, commandName, cmdBtn) {
   });
 }
 
+export function runCommand(card, commandName, cmdBtn) {
+  const repoCmd = findRepoCommand(card.dataset.repoPath, commandName);
+  return startRun(card, { commandName, command: repoCmd?.command || '', cmdBtn });
+}
+
 export function finishRun(runId, code) {
   const run = state.runs.get(runId);
   if (!run) return;
@@ -283,19 +292,23 @@ export function finishRun(runId, code) {
   const tail = elapsed ? ` in ${elapsed}` : '';
   div.textContent = code === 0 ? `✓ ${commandName} passed${tail}` : `✗ ${commandName} exited with code ${code}${tail}`;
   outputBody.appendChild(div);
-  if (code === 0) cmdBtn.classList.add('flash-pass');
-  else cmdBtn.classList.add('flash-fail');
-  setTimeout(() => cmdBtn.classList.remove('flash-fail', 'flash-pass'), 800);
+  if (cmdBtn) {
+    cmdBtn.classList.add(code === 0 ? 'flash-pass' : 'flash-fail');
+    setTimeout(() => cmdBtn.classList.remove('flash-fail', 'flash-pass'), 800);
+  }
+  const elapsedSuffix = elapsed ? ` • ${elapsed}` : '';
   const summary = code === 0
     ? `✓ ${commandName} • ${elapsed || 'done'}`
-    : `✗ ${commandName} • code ${code}${elapsed ? ` • ${elapsed}` : ''}`;
+    : `✗ ${commandName} • code ${code}${elapsedSuffix}`;
   panel.querySelector('[data-cmd-label]').textContent = summary;
   setCloseButtonRunning(panel, false);
   renderRunStats(panel, null);
 
-  cmdBtn.classList.remove('running');
-  cmdBtn.textContent = commandName;
-  delete cmdBtn.dataset.runId;
+  if (cmdBtn) {
+    cmdBtn.classList.remove('running');
+    cmdBtn.textContent = commandName;
+    delete cmdBtn.dataset.runId;
+  }
   state.runs.delete(runId);
   run.onComplete?.();
 

@@ -399,6 +399,23 @@ function clearPrCache(worktreePath) {
   }
 }
 
+// Reduce a GitHub statusCheckRollup array to one of: 'passing' | 'failing' | 'pending'
+// | null (no checks). CheckRuns expose status+conclusion; legacy StatusContexts expose state.
+function rollupOutcome(rollup) {
+  if (!Array.isArray(rollup) || rollup.length === 0) return null;
+  let pending = false;
+  for (const c of rollup) {
+    const raw = (c.conclusion || c.state || c.status || '').toUpperCase();
+    if (['FAILURE', 'ERROR', 'CANCELLED', 'TIMED_OUT', 'ACTION_REQUIRED', 'STARTUP_FAILURE'].includes(raw)) {
+      return 'failing';
+    }
+    if (['PENDING', 'IN_PROGRESS', 'QUEUED', 'EXPECTED', 'WAITING', 'REQUESTED', ''].includes(raw)) {
+      pending = true;
+    }
+  }
+  return pending ? 'pending' : 'passing';
+}
+
 async function prForBranch(worktreePath) {
   const ok = await ghAvailable();
   if (!ok) return null;
@@ -412,13 +429,21 @@ async function prForBranch(worktreePath) {
   const value = await new Promise((resolve) => {
     execFile(
       'gh',
-      ['pr', 'list', '--head', branch, '--json', 'number,title,url,state', '--limit', '1'],
-      { cwd: worktreePath, env: cleanEnv(), timeout: 4000 },
+      ['pr', 'list', '--head', branch, '--json', 'number,title,url,state,statusCheckRollup', '--limit', '1'],
+      { cwd: worktreePath, env: cleanEnv(), timeout: 5000 },
       (err, stdout) => {
         if (err) { resolve(null); return; }
         try {
           const list = JSON.parse(stdout || '[]');
-          resolve(list[0] || null);
+          const pr = list[0];
+          if (!pr) { resolve(null); return; }
+          resolve({
+            number: pr.number,
+            title: pr.title,
+            url: pr.url,
+            state: pr.state,
+            checks: rollupOutcome(pr.statusCheckRollup),
+          });
         } catch { resolve(null); }
       },
     );
@@ -426,6 +451,65 @@ async function prForBranch(worktreePath) {
 
   prCache.set(key, { t: Date.now(), value });
   return value;
+}
+
+// Subject + body of the most recent commit — used to pre-fill the create-PR form.
+async function lastCommitMessage(worktreePath) {
+  try {
+    const subject = (await gitExec(worktreePath, ['log', '-1', '--format=%s'])).trim();
+    const body = (await gitExec(worktreePath, ['log', '-1', '--format=%b'])).trim();
+    return { subject, body };
+  } catch {
+    return { subject: '', body: '' };
+  }
+}
+
+function ghExec(worktreePath, args, timeout = 30000) {
+  return new Promise((resolve, reject) => {
+    execFile('gh', args, { cwd: worktreePath, env: cleanEnv(), timeout }, (err, stdout, stderr) => {
+      if (err) return reject(new Error((stderr || stdout || err.message).trim()));
+      resolve((stdout || '').trim());
+    });
+  });
+}
+
+// Create a pull request for the worktree's branch. Pushes the branch first if it has
+// no upstream (so `gh pr create` doesn't fail). Returns the new PR's url + number.
+async function createPr(worktreePath, { title, body = '', draft = false } = {}) {
+  if (!title?.trim()) throw new Error('PR title is required.');
+  if (!(await ghAvailable())) throw new Error('GitHub CLI (`gh`) not found — install it to create PRs from the app.');
+  const branch = (await gitExec(worktreePath, ['symbolic-ref', '--short', 'HEAD']).catch(() => '')).trim();
+  if (!branch) throw new Error('Detached HEAD — check out a branch before creating a PR.');
+  // Ensure the branch is on the remote.
+  const hasUpstream = await gitExec(worktreePath, ['rev-parse', '--abbrev-ref', '@{upstream}']).then(() => true).catch(() => false);
+  if (!hasUpstream) {
+    await gitExec(worktreePath, ['push', '--set-upstream', 'origin', 'HEAD']);
+  } else {
+    await gitExec(worktreePath, ['push']).catch(() => { /* up to date or rejected — gh pr create will report if there's a real problem */ });
+  }
+  const args = ['pr', 'create', '--title', title.trim(), '--body', body || ''];
+  if (draft) args.push('--draft');
+  const out = await ghExec(worktreePath, args);
+  // gh prints the PR URL on success.
+  const url = (out.match(/https?:\/\/\S+/) || [out])[0];
+  clearPrCache(worktreePath);
+  let number = null;
+  const m = url.match(/\/pull\/(\d+)/);
+  if (m) number = Number.parseInt(m[1], 10);
+  return { url, number };
+}
+
+// Resolve a PR number to its head branch (creating a local branch from pull/N/head,
+// which works for fork PRs too) so a worktree can be added on it.
+async function fetchPrBranch(repoPath, prNumber) {
+  if (!(await ghAvailable())) throw new Error('GitHub CLI (`gh`) not found — install it to check out PRs.');
+  const n = Number.parseInt(prNumber, 10);
+  if (!Number.isFinite(n) || n <= 0) throw new Error('Enter a valid PR number.');
+  const title = await ghExec(repoPath, ['pr', 'view', String(n), '--json', 'title', '-q', '.title'], 10000)
+    .catch((e) => { throw new Error(`Could not read PR #${n}: ${e.message}`, { cause: e }); });
+  const localBranch = `pr-${n}`;
+  await gitExec(repoPath, ['fetch', 'origin', `pull/${n}/head:${localBranch}`, '--force']);
+  return { branch: localBranch, title, number: n };
 }
 
 async function stash(worktreePath, message) {
@@ -497,6 +581,9 @@ module.exports = {
   abortMerge,
   prForBranch,
   clearPrCache,
+  lastCommitMessage,
+  createPr,
+  fetchPrBranch,
   stash,
   stashPop,
   stashList,

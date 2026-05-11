@@ -19,6 +19,7 @@
       <ul id="workspace-list" class="sidebar-list"></ul>
       <div class="sidebar-footer">
         <button id="manage-repos" class="btn-link">Manage repos</button>
+        <button id="review-pr" class="btn-link" title="Check out a GitHub PR as a worktree">Review PR</button>
         <button id="settings-btn" class="btn-link">Settings</button>
         <button id="theme-toggle" class="btn-link">Theme: system</button>
         <button id="show-archived-toggle" class="btn-link">Show archived</button>
@@ -72,6 +73,7 @@
               <button id="ws-pull" class="btn">Pull</button>
               <button id="ws-sync" class="btn">Sync</button>
               <button id="ws-push" class="btn">Push</button>
+              <button id="ws-create-prs" class="btn" title="Open PRs for repos that don't have one yet">PRs…</button>
             </div>
             <button id="ws-run-all" class="btn btn-success">Run all</button>
             <button id="ws-run-all-seq" class="btn">Run sequentially</button>
@@ -382,6 +384,58 @@
         <span data-progress-text></span>
       </p>
       <p id="commit-error" class="error"></p>
+    </div>
+  </div>
+
+  <!-- Create pull request -->
+  <div id="create-pr-modal" class="modal hidden">
+    <div class="modal-content modal-wide">
+      <h2 id="create-pr-heading">Create pull request</h2>
+      <p class="hint" id="create-pr-meta"></p>
+      <label>Title
+        <input type="text" id="create-pr-input-title" placeholder="Pull request title" />
+      </label>
+      <label>Description
+        <textarea id="create-pr-input-body" rows="5" placeholder="Optional — supports Markdown"></textarea>
+      </label>
+      <label class="checkbox">
+        <input type="checkbox" id="create-pr-draft" /> Create as draft
+      </label>
+      <div class="modal-actions">
+        <button id="create-pr-cancel" class="btn">Cancel</button>
+        <button id="create-pr-confirm" class="btn btn-primary">Create PR</button>
+      </div>
+      <p id="create-pr-progress" class="commit-progress hidden">
+        <span class="spinner" aria-hidden="true"></span>
+        <span data-progress-text></span>
+      </p>
+      <p id="create-pr-error" class="error"></p>
+    </div>
+  </div>
+
+  <!-- Review a PR (check out as a workspace) -->
+  <div id="review-pr-modal" class="modal hidden">
+    <div class="modal-content">
+      <h2>Review a pull request</h2>
+      <p class="hint">Fetches the PR's branch and creates a worktree on it, in its own workspace.</p>
+      <label>Repository
+        <select id="review-pr-repo"></select>
+      </label>
+      <label>PR number
+        <input type="number" id="review-pr-number" min="1" step="1" placeholder="e.g. 123" />
+      </label>
+      <label>Workspace name <span class="muted">(optional)</span>
+        <input type="text" id="review-pr-name" placeholder="(pr-123)" />
+      </label>
+      <div class="modal-actions">
+        <button id="review-pr-cancel" class="btn">Cancel</button>
+        <button id="review-pr-confirm" class="btn btn-primary">Check out PR</button>
+      </div>
+      <p id="review-pr-progress" class="commit-progress hidden">
+        <span class="spinner" aria-hidden="true"></span>
+        <span data-progress-text></span>
+      </p>
+      <p id="review-pr-error" class="error"></p>
     </div>
   </div>
 
