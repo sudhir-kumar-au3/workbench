@@ -2,6 +2,20 @@
  * Worktree Workbench — modern theme
  * Design tokens (light + dark), neon accents in dark mode,
  * glass surfaces on sticky header and modals.
+ *
+ * COLOUR SEMANTICS — keep new UI consistent with these meanings:
+ *   accent  (--accent / --accent-grad / --accent-soft)
+ *           "this is selected / primary / yours" — active sidebar item,
+ *           primary buttons, staged tag, previewing row, focus rings.
+ *           User-pickable (indigo / emerald / cyan / rose / amber presets).
+ *   success / clean (green) — passed runs, clean working tree, added files.
+ *   danger  (red) — failed runs, errors, destructive actions, deleted files.
+ *   warning / dirty (amber) — uncommitted changes, modified files.
+ *   info / PR-open (cyan)  — open pull request chips, informational accents.
+ *   merged  (purple) — merged pull request chips.
+ *   muted   (neutral grey) — secondary metadata (CPU/mem chip, untracked, …).
+ * Chip variants (.chip-success / -warn / -danger / -info / -merged / -muted
+ * / -accent) encode exactly these — reach for one rather than a fresh colour.
  * ================================================================= */
 
 :root {
@@ -325,6 +339,22 @@ body.resizing * { cursor: col-resize !important; }
 }
 .empty-state p { margin: 8px 0; font-size: 14px; }
 .empty-actions { display: flex; gap: 10px; justify-content: center; margin-top: 28px; }
+
+/* In-list empty placeholders (history, modified files, commit checklist, conflicts, …)
+   — one consistent treatment regardless of which list it's in. */
+.empty-row {
+  padding: 22px 16px;
+  text-align: center;
+  color: var(--text-faint);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.empty-row.error {
+  color: var(--danger);
+  text-align: left;
+  white-space: pre-wrap;
+  padding: 14px;
+}
 .shortcut-hint {
   margin-top: 28px;
   font-size: 11px;
@@ -588,24 +618,50 @@ body.resizing * { cursor: col-resize !important; }
 .branch-editor-error.error { color: var(--danger); }
 .branch-editor-error.muted { color: var(--text-faint); }
 
-/* Status badges */
-.status-badge {
-  font-size: 10px;
+/* ---------------------------------------------------------------------------
+   Chip system — one set of metrics for every small pill in the app (status
+   badge, PR chip, CPU/mem chip, etc.). Variants supply colour only; everything
+   shares the same shape, size, padding, and tabular numerals so the UI reads as
+   one design rather than a pile of differently-built badges.
+   --------------------------------------------------------------------------- */
+.chip,
+.status-badge,
+.pr-chip,
+.test-output-toolbar .run-stats {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
   font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1.4;
   padding: 2px 8px;
   border-radius: 999px;
-  letter-spacing: 0.02em;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  border: 1px solid transparent;
 }
-.status-badge.clean { color: var(--badge-clean-fg); background: var(--badge-clean-bg); }
+.chip-success { color: var(--badge-clean-fg); background: var(--badge-clean-bg); border-color: color-mix(in srgb, var(--badge-clean-fg) 30%, transparent); }
+.chip-warn    { color: var(--badge-dirty-fg); background: var(--badge-dirty-bg); border-color: color-mix(in srgb, var(--badge-dirty-fg) 30%, transparent); }
+.chip-danger  { color: var(--badge-error-fg); background: var(--badge-error-bg); border-color: color-mix(in srgb, var(--badge-error-fg) 30%, transparent); }
+.chip-info    { color: #67e8f9; background: rgba(34, 211, 238, 0.12); border-color: rgba(34, 211, 238, 0.35); }
+.chip-merged  { color: #d8b4fe; background: rgba(168, 85, 247, 0.12); border-color: rgba(168, 85, 247, 0.35); }
+.chip-muted   { color: var(--badge-info-fg); background: var(--badge-info-bg); border-color: rgba(127, 127, 127, 0.18); }
+.chip-accent  { color: var(--accent); background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 28%, transparent); }
+.chip-sm { font-size: 9px; padding: 1px 6px; text-transform: uppercase; letter-spacing: 0.05em; }
+
+/* Status badge — uses the chip metrics above; these supply state colours. */
+.status-badge.clean { color: var(--badge-clean-fg); background: var(--badge-clean-bg); border-color: color-mix(in srgb, var(--badge-clean-fg) 30%, transparent); }
 .status-badge.dirty {
   color: var(--badge-dirty-fg);
   background: var(--badge-dirty-bg);
+  border-color: color-mix(in srgb, var(--badge-dirty-fg) 30%, transparent);
   animation: dirty-pulse 2.4s ease-in-out infinite;
   cursor: pointer;
   transition: filter 0.15s ease;
 }
 .status-badge.dirty:hover { filter: brightness(1.15); text-decoration: underline; }
-.status-badge.error { color: var(--badge-error-fg); background: var(--badge-error-bg); }
+.status-badge.error { color: var(--badge-error-fg); background: var(--badge-error-bg); border-color: color-mix(in srgb, var(--badge-error-fg) 30%, transparent); }
 
 @keyframes dirty-pulse {
   0%, 100% { opacity: 1; }
@@ -613,10 +669,12 @@ body.resizing * { cursor: col-resize !important; }
 }
 
 .ahead-behind {
-  font-size: 10px;
+  font-size: 10.5px;
   font-family: 'SF Mono', Menlo, monospace;
   color: var(--text-muted);
   font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
 }
 
 .member-path {
@@ -628,6 +686,21 @@ body.resizing * { cursor: col-resize !important; }
   text-overflow: ellipsis;
 }
 .member-actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+/* Tertiary actions (open in Finder / Terminal / editor) reveal on hover or keyboard
+   focus, so the card header stays uncluttered when you're just scanning. Layout space
+   is reserved (opacity, not display) so nothing jumps when they fade in. */
+.member-quick-actions {
+  display: inline-flex;
+  gap: 6px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.14s ease;
+}
+.member-card:hover .member-quick-actions,
+.member-card:focus-within .member-quick-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
 .btn.btn-icon {
   padding: 0;
   width: 28px;
@@ -772,14 +845,10 @@ body.resizing * { cursor: col-resize !important; }
 .test-output.collapsed [data-search] { display: none; }
 .test-output.collapsed .test-output-toolbar { border-bottom: none; }
 .test-output-toolbar .run-stats {
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.02em;
-  padding: 2px 8px;
-  border-radius: 999px;
+  /* shape/size from the shared chip rule above */
   background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  white-space: nowrap;
+  border-color: rgba(255, 255, 255, 0.08);
+  color: var(--text-muted);
 }
 .test-output-toolbar .run-stats.hidden { display: none; }
 body.hide-resource-stats .test-output-toolbar .run-stats { display: none !important; }
@@ -1039,17 +1108,11 @@ textarea { resize: vertical; min-height: 60px; }
 .hint { color: var(--text-faint); font-size: 12px; margin: 0 0 12px 0; line-height: 1.5; }
 
 .pr-chip {
-  display: inline-flex;
-  align-items: center;
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  padding: 2px 8px;
-  border-radius: 999px;
+  /* shape/size from the shared chip rule above */
   cursor: pointer;
   background: rgba(34, 211, 238, 0.12);
   color: #67e8f9;
-  border: 1px solid rgba(34, 211, 238, 0.35);
+  border-color: rgba(34, 211, 238, 0.35);
   transition: background 0.15s ease, color 0.15s ease;
 }
 .pr-chip.hidden { display: none; }
@@ -1089,12 +1152,6 @@ textarea { resize: vertical; min-height: 60px; }
   border-radius: 8px;
   background: rgba(0, 0, 0, 0.18);
   border: 1px solid rgba(255, 255, 255, 0.06);
-}
-.history-list .empty-row {
-  padding: 18px;
-  text-align: center;
-  color: var(--text-faint);
-  font-size: 12px;
 }
 .history-row {
   display: flex;
@@ -1150,12 +1207,6 @@ textarea { resize: vertical; min-height: 60px; }
   border-radius: 8px;
   background: rgba(0, 0, 0, 0.18);
   border: 1px solid rgba(255, 255, 255, 0.06);
-}
-.commit-files-list .empty-row {
-  padding: 14px;
-  text-align: center;
-  color: var(--text-faint);
-  font-size: 12px;
 }
 .commit-file-row {
   display: flex;
@@ -1834,21 +1885,19 @@ body.reduced-motion *, body.reduced-motion *::before, body.reduced-motion *::aft
   border-color: rgba(220, 38, 38, 0.95);
 }
 .staged-tag {
+  /* a mini chip — see the chip system above */
+  display: inline-flex;
+  align-items: center;
   font-size: 9px;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   padding: 1px 6px;
   border-radius: 999px;
   background: var(--accent-soft);
   color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
 }
-.modified-files-list .empty-row {
-  padding: 24px;
-  text-align: center;
-  color: var(--text-faint);
-  font-size: 12px;
-}
-.modified-files-list .empty-row.error { color: var(--danger); white-space: pre-wrap; text-align: left; padding: 14px; }
 
 /* ----- Import modal rows ----- */
 .import-row {

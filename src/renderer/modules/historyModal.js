@@ -1,6 +1,7 @@
 import { $, escapeHtml } from './utils.js';
 import { notify } from './notify.js';
 import { showRawDiff } from './diffModal.js';
+import { icons } from './icons.js';
 
 let allCommits = [];
 let currentLabel = '';
@@ -40,7 +41,7 @@ function renderList(filter = '') {
           <span class="muted">${escapeHtml(shortDate(c.date))}</span>
         </div>
       </div>
-      <button class="btn btn-ghost" data-action="copy" title="Copy hash">⧉</button>
+      <button class="btn btn-icon" data-action="copy" title="Copy hash" aria-label="Copy hash">${icons.copy(13)}</button>
     `;
     row.addEventListener('click', async (e) => {
       if (e.target.closest('[data-action="copy"]')) return;

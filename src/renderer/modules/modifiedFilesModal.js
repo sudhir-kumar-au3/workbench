@@ -2,6 +2,7 @@ import { $, escapeHtml } from './utils.js';
 import { notify } from './notify.js';
 import { openDiff } from './diffModal.js';
 import { loadStatusFor } from './statuses.js';
+import { icons } from './icons.js';
 
 const KIND_LABEL = {
   M: 'Modified',
@@ -42,9 +43,9 @@ function renderRows(files, worktreePath) {
       </div>
       <div class="modified-file-actions">
         ${stagedTag}
-        <button class="btn btn-ghost" data-action="copy" title="Copy full path">⧉</button>
-        <button class="btn btn-ghost" data-action="open" title="Open in editor">↗</button>
-        <button class="btn btn-ghost btn-discard" data-action="discard" title="Discard changes (irreversible)">⌫</button>
+        <button class="btn btn-icon" data-action="copy" title="Copy full path" aria-label="Copy full path">${icons.copy(13)}</button>
+        <button class="btn btn-icon" data-action="open" title="Open in editor" aria-label="Open in editor">${icons.external(13)}</button>
+        <button class="btn btn-icon btn-discard" data-action="discard" title="Discard changes (irreversible)" aria-label="Discard changes">${icons.trash(13)}</button>
       </div>
     `;
     row.querySelector('[data-action="copy"]').addEventListener('click', async () => {

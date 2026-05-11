@@ -1,6 +1,7 @@
 import { state } from './state.js';
 import { loadAllStatuses } from './statuses.js';
 import { renderAnsiInto } from './ansi.js';
+import { icons } from './icons.js';
 
 const NEAR_BOTTOM_PX = 32; // tolerance for "is the user scrolled to the bottom?"
 
@@ -95,7 +96,7 @@ export function ensureOutputPanel(card) {
         <span class="run-timer muted" data-timer></span>
         <span class="run-stats muted hidden" data-stats title="CPU cores in use · resident memory"></span>
         <input type="text" placeholder="Filter output…" data-search />
-        <button class="btn btn-ghost" data-rerun title="Re-run">↻</button>
+        <button class="btn btn-icon" data-rerun title="Re-run">${icons.refresh(13)}</button>
         <button class="btn btn-ghost" data-close title="Close output panel" aria-label="Close output panel">${CLOSE_ICON_HTML}</button>
       </div>
       <div class="test-output-body" data-output-body></div>
@@ -240,9 +241,7 @@ export function runCommand(card, commandName, cmdBtn) {
     }
 
     const panel = ensureOutputPanel(card);
-    panel.classList.remove('hidden');
-    panel.classList.remove('collapsed');
-    panel.classList.remove('detached');
+    panel.classList.remove('hidden', 'collapsed', 'detached');
     panel.dataset.lastCommand = commandName;
     panel.querySelector('[data-cmd-label]').textContent = `${commandName} • running`;
     setCloseButtonRunning(panel, true);

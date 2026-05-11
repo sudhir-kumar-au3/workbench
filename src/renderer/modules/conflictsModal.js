@@ -1,6 +1,7 @@
 import { $, escapeHtml } from './utils.js';
 import { notify } from './notify.js';
 import { loadStatusFor } from './statuses.js';
+import { icons } from './icons.js';
 
 let currentWorktreePath = null;
 
@@ -52,7 +53,7 @@ function renderFiles(files) {
         <div class="modified-file-fullpath" title="${escapeHtml(fullPath)}">${escapeHtml(fullPath)}</div>
       </div>
       <div class="modified-file-actions">
-        <button class="btn btn-ghost" data-action="open" title="Open in editor">↗</button>
+        <button class="btn btn-icon" data-action="open" title="Open in editor" aria-label="Open in editor">${icons.external(13)}</button>
         <button class="btn btn-primary" data-action="resolved" title="Mark as resolved (git add)">Mark resolved</button>
       </div>
     `;

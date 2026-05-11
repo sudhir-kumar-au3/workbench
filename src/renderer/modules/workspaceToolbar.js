@@ -7,6 +7,7 @@ import { showToast } from './bulkGitToast.js';
 import { notify } from './notify.js';
 import { openGitFailure } from './gitFailureModal.js';
 import { refreshPrChips } from './memberCard.js';
+import { icons } from './icons.js';
 
 const OP_DISPLAY_TO_KIND = {
   fetch: 'pull',  // fetch failures are basically network/auth — group with pull
@@ -97,6 +98,11 @@ async function runBulkOp(op, label) {
 }
 
 export function setupWorkspaceToolbar({ openMetadataModal }) {
+  // Fill the icon-only toolbar buttons from the shared icon set.
+  $('#ws-refresh').innerHTML = icons.refresh();
+  $('#ws-compact-toggle').innerHTML = icons.rows();
+  $('#ws-edit-meta').innerHTML = icons.edit();
+
   $('#ws-refresh').addEventListener('click', async () => {
     // Explicit refresh: bust the PR cache so chips re-query GitHub.
     await globalThis.api.git.clearPrCache(null).catch(() => {});
